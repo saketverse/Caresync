@@ -28,8 +28,9 @@ import com.example.ui.theme.*
 fun AuthScreen(
     isLoading: Boolean,
     onLogin: (String, String) -> Unit,
-    onSignUp: (String, Int, String, String, String) -> Unit, // fullName, age, email, password, role
+    onSignUp: (String, Int, String, String, String, () -> Unit) -> Unit, // fullName, age, email, password, role, onVerificationSent
     onForgotPassword: (String) -> Unit,
+    onResendVerificationEmail: (String, String?) -> Unit,
     onGoogleLoginSuccess: () -> Unit,
     onSkipQuickDemo: () -> Unit
 ) {
@@ -43,10 +44,11 @@ fun AuthScreen(
     var confirmPassword by remember { mutableStateOf("") }
     var selectedRole by remember { mutableStateOf(UserProfile.ROLE_PATIENT) }
 
-    // Dialog state
+    // Dialog & Notice states
     var showForgotPasswordDialog by remember { mutableStateOf(false) }
     var resetEmailInput by remember { mutableStateOf("") }
     var validationError by remember { mutableStateOf<String?>(null) }
+    var verificationPendingMessage by remember { mutableStateOf<String?>(null) }
 
     val scrollState = rememberScrollState()
 
@@ -140,14 +142,111 @@ fun AuthScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
 
+                    // Verification Info / Notice Banner
+                    if (verificationPendingMessage != null) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Filled.MarkEmailRead,
+                                        contentDescription = null,
+                                        tint = MedicalPrimary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = verificationPendingMessage!!,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                TextButton(
+                                    onClick = {
+                                        if (email.isNotBlank()) {
+                                            onResendVerificationEmail(email, password)
+                                        } else {
+                                            validationError = "Please enter your email to resend verification."
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Send,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MedicalPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        "Resend verification email",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = MedicalPrimary
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     if (validationError != null) {
-                        Text(
-                            text = validationError!!,
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 13.sp,
-                            modifier = Modifier.padding(bottom = 12.dp),
-                            textAlign = TextAlign.Center
-                        )
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = validationError!!,
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center
+                                )
+
+                                if (validationError!!.contains("verify your email", ignoreCase = true)) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Button(
+                                        onClick = {
+                                            if (email.isNotBlank()) {
+                                                onResendVerificationEmail(email, password)
+                                            } else {
+                                                validationError = "Please enter your email address above."
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.error,
+                                            contentColor = MaterialTheme.colorScheme.onError
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.Send,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Resend verification email", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // Signup only fields
@@ -309,7 +408,10 @@ fun AuthScreen(
                                 } else {
                                     validationError = null
                                     val ageVal = ageText.toIntOrNull() ?: 25
-                                    onSignUp(fullName, ageVal, email, password, selectedRole)
+                                    onSignUp(fullName, ageVal, email, password, selectedRole) {
+                                        isSignUp = false
+                                        verificationPendingMessage = "Please verify your email before logging in. A verification link was sent to $email."
+                                    }
                                 }
                             }
                         },
@@ -379,13 +481,21 @@ fun AuthScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    TextButton(onClick = onSkipQuickDemo) {
+                    FilledTonalButton(
+                        onClick = onSkipQuickDemo,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Skip for Now (Quick Demo Mode)",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp
+                            text = "Explore App Demo Directly",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }

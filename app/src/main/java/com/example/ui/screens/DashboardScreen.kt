@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,7 +20,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.LanguageManager
 import com.example.data.Medication
+import com.example.ui.components.ColorWarningView
+import com.example.ui.components.PillOrganizerSection
 import com.example.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,16 +33,22 @@ fun DashboardScreen(
     medications: List<Medication>,
     interactionResult: String?,
     isCheckingInteractions: Boolean,
+    selectedLanguage: String = LanguageManager.LANG_ENGLISH,
+    isElderMode: Boolean = true,
     onMarkTaken: (Long) -> Unit,
+    onSpeakReminder: (Medication) -> Unit = {},
+    onListenWarning: (String) -> Unit = {},
     onNavigateToAdd: () -> Unit,
     onNavigateToInteractions: () -> Unit,
     onNavigateToChatbot: () -> Unit,
     onNavigateToScanner: () -> Unit,
     onNavigateToFamily: () -> Unit,
     onNavigateToProfile: () -> Unit,
-    onTriggerEmergency: () -> Unit
+    onTriggerEmergency: () -> Unit,
+    onLogout: () -> Unit = {}
 ) {
     var showEmergencyDialog by remember { mutableStateOf(false) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
 
     val takenCount = medications.count { it.isTakenToday }
     val totalMeds = medications.size
@@ -53,14 +61,14 @@ fun DashboardScreen(
                 title = {
                     Column {
                         Text(
-                            text = "CareSync",
+                            text = LanguageManager.getText("app_title", selectedLanguage),
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = MedicalPrimary
                             )
                         )
                         Text(
-                            text = "Welcome, $userName",
+                            text = "Namaste, $userName",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -68,9 +76,16 @@ fun DashboardScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showLogoutDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.ExitToApp,
+                            contentDescription = "Log Out",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                     IconButton(onClick = onNavigateToProfile) {
                         Surface(
-                            modifier = Modifier.size(36.dp),
+                            modifier = Modifier.size(38.dp),
                             shape = CircleShape,
                             color = MedicalPrimaryContainer
                         ) {
@@ -118,7 +133,7 @@ fun DashboardScreen(
                         ) {
                             Column {
                                 Text(
-                                    text = "Daily Adherence Rate",
+                                    text = "Daily Adherence Score",
                                     color = Color.White.copy(alpha = 0.85f),
                                     fontSize = 14.sp
                                 )
@@ -172,61 +187,22 @@ fun DashboardScreen(
                 }
             }
 
-            // 2. Urgent Safety & Drug Interaction Card
+            // 2. Color-based Safety Indicator Card
             item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onNavigateToInteractions() },
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (interactionResult?.contains("HIGH") == true) HealthDangerContainer else HealthSafeContainer
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Shield,
-                            contentDescription = null,
-                            tint = if (interactionResult?.contains("HIGH") == true) HealthDanger else HealthSafe,
-                            modifier = Modifier.size(36.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "AI Drug Interaction Shield",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = if (isCheckingInteractions) "Analyzing interactions with Gemini AI..."
-                                else interactionResult?.take(75) ?: "Active medicines verified. Tap to run live AI check.",
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.Filled.ChevronRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+                ColorWarningView(
+                    riskLevel = if (interactionResult?.contains("HIGH") == true) "HIGH" else "SAFE",
+                    rawSummary = interactionResult ?: "Active medications in schedule: ${medications.joinToString { it.name }}. All combinations safe.",
+                    selectedLanguage = selectedLanguage,
+                    isElderMode = isElderMode,
+                    onListenWarning = onListenWarning
+                )
             }
 
-            // 3. Quick Action Buttons Grid
+            // 3. Quick Assistant Tools
             item {
                 Column {
                     Text(
-                        text = "Quick Assistant Tools",
+                        text = "Quick Care Tools",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
@@ -244,8 +220,8 @@ fun DashboardScreen(
                             onClick = onNavigateToAdd
                         )
                         QuickActionButton(
-                            title = "Scan Prescription",
-                            icon = Icons.Filled.DocumentScanner,
+                            title = "Scan Strip",
+                            icon = Icons.Filled.Camera,
                             containerColor = MedicalSecondaryContainer,
                             iconColor = MedicalSecondary,
                             modifier = Modifier.weight(1f),
@@ -271,7 +247,7 @@ fun DashboardScreen(
                 }
             }
 
-            // 4. Low Stock Inventory Alert Banner
+            // 4. Low Stock Inventory Banner
             if (lowStockMeds.isNotEmpty()) {
                 item {
                     Card(
@@ -292,12 +268,12 @@ fun DashboardScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Low Medicine Inventory Alert",
+                                    text = "Low Medicine Refill Warning",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp
                                 )
                                 Text(
-                                    text = "${lowStockMeds.first().name} has only ${lowStockMeds.first().remainingTablets} tablets left.",
+                                    text = "${lowStockMeds.first().name} has only ${lowStockMeds.first().remainingTablets} tablets remaining.",
                                     fontSize = 12.sp
                                 )
                             }
@@ -306,48 +282,15 @@ fun DashboardScreen(
                 }
             }
 
-            // 5. Today's Medication Schedule
+            // 5. Elder Pill Organizer Section (Morning, Afternoon, Evening, Night)
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Today's Schedule",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                    )
-                    TextButton(onClick = onNavigateToAdd) {
-                        Text("+ New Medicine")
-                    }
-                }
-            }
-
-            if (medications.isEmpty()) {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier.padding(32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No medications scheduled yet. Tap + New Medicine to begin.",
-                                fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            } else {
-                items(medications, key = { it.id }) { med ->
-                    MedicationScheduleCard(
-                        medication = med,
-                        onMarkTaken = { onMarkTaken(med.id) }
-                    )
-                }
+                PillOrganizerSection(
+                    medications = medications,
+                    selectedLanguage = selectedLanguage,
+                    isElderMode = isElderMode,
+                    onMarkTaken = onMarkTaken,
+                    onSpeakReminder = onSpeakReminder
+                )
             }
 
             // Emergency SOS Dispatch Button
@@ -369,8 +312,9 @@ fun DashboardScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Emergency SOS Alert Dispatch",
-                        fontWeight = FontWeight.Bold
+                        text = "🚨 Emergency SOS Alert Dispatch",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
                     )
                 }
                 Spacer(modifier = Modifier.height(24.dp))
@@ -381,8 +325,8 @@ fun DashboardScreen(
     if (showEmergencyDialog) {
         AlertDialog(
             onDismissRequest = { showEmergencyDialog = false },
-            title = { Text("Send Emergency SOS?") },
-            text = { Text("This will notify your registered emergency contacts (Dr. Vance & Eleanor Mitchell) with your current status and medication list.") },
+            title = { Text("Send Emergency SOS Alert?") },
+            text = { Text("This will send an emergency notification to your registered caregiver (Aarav Sharma) with your location and medication status.") },
             confirmButton = {
                 Button(
                     onClick = {
@@ -391,7 +335,7 @@ fun DashboardScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = HealthDanger)
                 ) {
-                    Text("Send SOS Now")
+                    Text("Send Emergency SOS", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -401,29 +345,61 @@ fun DashboardScreen(
             }
         )
     }
+
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Confirm Sign Out", fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to log out of CareSync?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showLogoutDialog = false
+                        onLogout()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Log Out", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showLogoutDialog = false },
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
-fun SummaryChip(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically
+private fun SummaryChip(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Surface(
+        color = Color.White.copy(alpha = 0.2f),
+        shape = RoundedCornerShape(12.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = Color.White.copy(alpha = 0.9f),
-            modifier = Modifier.size(16.dp)
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Column {
-            Text(text = value, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            Text(text = label, color = Color.White.copy(alpha = 0.75f), fontSize = 11.sp)
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Column {
+                Text(value, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text(label, color = Color.White.copy(alpha = 0.8f), fontSize = 10.sp)
+            }
         }
     }
 }
 
 @Composable
-fun QuickActionButton(
+private fun QuickActionButton(
     title: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     containerColor: Color,
@@ -437,125 +413,18 @@ fun QuickActionButton(
         colors = CardDefaults.cardColors(containerColor = containerColor)
     ) {
         Column(
-            modifier = Modifier
-                .padding(12.dp)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                tint = iconColor,
-                modifier = Modifier.size(28.dp)
-            )
+            Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(24.dp))
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = title,
-                fontSize = 11.sp,
+                title,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                fontSize = 11.sp,
+                color = iconColor,
+                maxLines = 1
             )
-        }
-    }
-}
-
-@Composable
-fun MedicationScheduleCard(
-    medication: Medication,
-    onMarkTaken: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (medication.isTakenToday) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = if (medication.isTakenToday) HealthSafeContainer else MedicalPrimaryContainer,
-                modifier = Modifier.size(48.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = if (medication.isTakenToday) Icons.Filled.CheckCircle else Icons.Filled.Medication,
-                        contentDescription = null,
-                        tint = if (medication.isTakenToday) HealthSafe else MedicalPrimary,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = medication.name,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
-                Text(
-                    text = "${medication.dosage} • ${medication.beforeOrAfterFood}",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 4.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Schedule,
-                        contentDescription = null,
-                        modifier = Modifier.size(12.dp),
-                        tint = MedicalPrimary
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = medication.timeOfConsumption,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MedicalPrimary
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "${medication.remainingTablets} pills left",
-                        fontSize = 12.sp,
-                        color = if (medication.remainingTablets <= 7) HealthWarning else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            if (!medication.isTakenToday) {
-                Button(
-                    onClick = onMarkTaken,
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text("Take", fontSize = 12.sp)
-                }
-            } else {
-                Surface(
-                    color = HealthSafeContainer,
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = "Taken Today",
-                        color = HealthSafe,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-            }
         }
     }
 }

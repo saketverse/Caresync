@@ -16,7 +16,7 @@ data class Medication(
     val beforeOrAfterFood: String,  // "Before Food", "After Food", "With Food"
     val instructions: String = "",  // e.g. "Take with a full glass of water"
     val category: String = "Prescription", // "Prescription", "OTC", "Supplement"
-    val prescribedBy: String = "Dr. Smith",
+    val prescribedBy: String = "",
     val isActive: Boolean = true,
     val isTakenToday: Boolean = false,
     val lastTakenTimestamp: Long = 0L

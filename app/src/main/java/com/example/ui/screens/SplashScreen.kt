@@ -36,6 +36,8 @@ fun SplashScreen(
 
     LaunchedEffect(Unit) {
         startAnimation = true
+        kotlinx.coroutines.delay(2000)
+        onNavigateNext()
     }
 
     Box(

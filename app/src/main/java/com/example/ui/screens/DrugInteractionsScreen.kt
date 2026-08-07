@@ -3,8 +3,6 @@ package com.example.ui.screens
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -19,7 +17,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.DrugInteraction
+import com.example.data.LanguageManager
 import com.example.data.Medication
+import com.example.ui.components.ColorWarningView
 import com.example.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,17 +29,17 @@ fun DrugInteractionsScreen(
     savedInteractions: List<DrugInteraction>,
     interactionResult: String?,
     isChecking: Boolean,
-    onRunAnalysis: () -> Unit
+    selectedLanguage: String = LanguageManager.LANG_ENGLISH,
+    isElderMode: Boolean = true,
+    onRunAnalysis: () -> Unit,
+    onListenWarning: (String) -> Unit = {}
 ) {
-    var customDrugA by remember { mutableStateOf("") }
-    var customDrugB by remember { mutableStateOf("") }
-
     val scrollState = rememberScrollState()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("AI Drug Interaction Detector", fontWeight = FontWeight.Bold) },
+                title = { Text("AI Drug Safety & Interaction Guide", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
@@ -53,7 +53,7 @@ fun DrugInteractionsScreen(
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header Card
+            // Hero Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
@@ -62,23 +62,33 @@ fun DrugInteractionsScreen(
                 Column(
                     modifier = Modifier.padding(20.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Filled.Shield,
-                            contentDescription = null,
-                            tint = HealthSafe,
-                            modifier = Modifier.size(36.dp)
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color.White.copy(alpha = 0.2f),
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Filled.Shield,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                        }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Gemini Clinical Safety Engine",
+                                text = "CareSync AI Safety Check",
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 18.sp
                             )
                             Text(
-                                text = "Real-time AI analysis of potential multi-drug contraindications & risks.",
+                                text = "Real-time AI evaluation of multi-drug safety & contraindications.",
                                 color = Color.White.copy(alpha = 0.85f),
                                 fontSize = 12.sp
                             )
@@ -100,160 +110,123 @@ fun DrugInteractionsScreen(
                         if (isChecking) {
                             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Analyzing Schedule with Gemini AI...")
+                            Text("Evaluating Schedule with AI...")
                         } else {
                             Icon(Icons.Filled.Psychology, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Analyze All Active Medications (${medications.size})", fontWeight = FontWeight.Bold)
+                            Text("Check Interactions for My Medications (${medications.size})", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
 
-            // Risk Scale Guide Legend
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Risk Level Classification Legend:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        RiskBadge("🟢 SAFE", HealthSafeContainer, HealthSafe)
-                        RiskBadge("🟡 MODERATE RISK", HealthWarningContainer, HealthWarning)
-                        RiskBadge("🔴 HIGH RISK", HealthDangerContainer, HealthDanger)
-                    }
-                }
-            }
-
-            // Live Analysis Result Box
+            // Simple Color-Based Warning Result
             if (interactionResult != null) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (interactionResult.contains("HIGH RISK")) HealthDangerContainer
-                        else if (interactionResult.contains("MODERATE RISK")) HealthWarningContainer
-                        else HealthSafeContainer
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Filled.AutoAwesome,
-                                contentDescription = null,
-                                tint = MedicalPrimary,
-                                modifier = Modifier.size(28.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Gemini AI Safety Evaluation Output",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Text(
-                            text = interactionResult,
-                            fontSize = 14.sp,
-                            lineHeight = 20.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+                val evaluatedRisk = when {
+                    interactionResult.contains("HIGH RISK") || interactionResult.contains("🔴") -> "HIGH"
+                    interactionResult.contains("MODERATE RISK") || interactionResult.contains("🟡") -> "MODERATE"
+                    else -> "SAFE"
                 }
+
+                ColorWarningView(
+                    riskLevel = evaluatedRisk,
+                    rawSummary = interactionResult,
+                    selectedLanguage = selectedLanguage,
+                    isElderMode = isElderMode,
+                    onListenWarning = onListenWarning
+                )
+            } else {
+                // Default Safe Status Indicator
+                ColorWarningView(
+                    riskLevel = "SAFE",
+                    rawSummary = "Active medications in schedule: ${medications.joinToString { it.name }}. No high-risk interactions detected.",
+                    selectedLanguage = selectedLanguage,
+                    isElderMode = isElderMode,
+                    onListenWarning = onListenWarning
+                )
             }
 
-            // History / Verified Interaction Cards
+            // Detailed Saved Interactions Database Cards
             Text(
-                text = "Verified Drug Interactions Database",
+                text = "Clinical Interaction Reference Database",
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
             )
 
-            savedInteractions.forEach { item ->
-                InteractionCard(item = item)
-            }
-        }
-    }
-}
+            if (savedInteractions.isEmpty()) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surface
+                ) {
+                    Box(modifier = Modifier.padding(20.dp), contentAlignment = Alignment.Center) {
+                        Text("No recorded interaction warnings in database.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            } else {
+                savedInteractions.forEach { interaction ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${interaction.drugA} + ${interaction.drugB}",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp,
+                                    color = MedicalPrimary
+                                )
+                                Surface(
+                                    color = when (interaction.riskLevel) {
+                                        "HIGH" -> HealthDangerContainer
+                                        "MODERATE" -> HealthWarningContainer
+                                        else -> HealthSafeContainer
+                                    },
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = "${interaction.riskLevel} RISK",
+                                        color = when (interaction.riskLevel) {
+                                            "HIGH" -> HealthDanger
+                                            "MODERATE" -> HealthWarning
+                                            else -> HealthSafe
+                                        },
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
 
-@Composable
-fun RiskBadge(text: String, containerColor: Color, textColor: Color) {
-    Surface(
-        color = containerColor,
-        shape = RoundedCornerShape(8.dp)
-    ) {
-        Text(
-            text = text,
-            color = textColor,
-            fontWeight = FontWeight.Bold,
-            fontSize = 10.sp,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-        )
-    }
-}
+                            Text(
+                                text = "Summary: ${interaction.summary}",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
 
-@Composable
-fun InteractionCard(item: DrugInteraction) {
-    val (bgColor, textColor) = when (item.riskLevel) {
-        "HIGH" -> HealthDangerContainer to HealthDanger
-        "MODERATE" -> HealthWarningContainer to HealthWarning
-        else -> HealthSafeContainer to HealthSafe
-    }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "${item.drugA} + ${item.drugB}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
-                RiskBadge(text = "${item.riskLevel} RISK", containerColor = bgColor, textColor = textColor)
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = item.summary,
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            if (item.recommendation.isNotBlank()) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.MedicalServices,
-                        contentDescription = null,
-                        tint = MedicalPrimary,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Guidance: ${item.recommendation}",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MedicalPrimary
-                    )
+                            if (interaction.recommendation.isNotBlank()) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.secondaryContainer,
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        text = "💡 Safety Recommendation: ${interaction.recommendation}",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.padding(8.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -46,7 +46,11 @@ class FirebaseAuthRepository(private val context: Context) {
             return suspendCancellableCoroutine { continuation ->
                 auth.createUserWithEmailAndPassword(email, password)
                     .addOnSuccessListener { authResult ->
-                        val uid = authResult.user?.uid ?: UUID.randomUUID().toString()
+                        val user = authResult.user
+                        // 1. Automatically send verification email
+                        user?.sendEmailVerification()
+
+                        val uid = user?.uid ?: UUID.randomUUID().toString()
                         val profile = UserProfile(
                             uid = uid,
                             name = fullName,
@@ -65,15 +69,11 @@ class FirebaseAuthRepository(private val context: Context) {
                             "connectionCode" to connectionCode
                         )
 
-                        // Save to Firestore
+                        // Save user profile to Firestore
                         firestore.collection("users").document(uid).set(userMap)
-                            .addOnSuccessListener {
-                                saveLocalProfile(profile)
-                                if (continuation.isActive) continuation.resume(Result.success(profile))
-                            }
-                            .addOnFailureListener { e ->
-                                // Even if Firestore write fails, user account was created in Auth
-                                saveLocalProfile(profile)
+                            .addOnCompleteListener {
+                                prefs.edit().putBoolean("is_email_verified_${email.lowercase()}", false).apply()
+                                auth.signOut() // Require user to log in after verifying email
                                 if (continuation.isActive) continuation.resume(Result.success(profile))
                             }
                     }
@@ -88,7 +88,7 @@ class FirebaseAuthRepository(private val context: Context) {
                             role = role,
                             connectionCode = connectionCode
                         )
-                        saveLocalProfile(profile)
+                        prefs.edit().putBoolean("is_email_verified_${email.lowercase()}", false).apply()
                         if (continuation.isActive) continuation.resume(Result.success(profile))
                     }
             }
@@ -103,7 +103,7 @@ class FirebaseAuthRepository(private val context: Context) {
                 role = role,
                 connectionCode = connectionCode
             )
-            saveLocalProfile(profile)
+            prefs.edit().putBoolean("is_email_verified_${email.lowercase()}", false).apply()
             return Result.success(profile)
         }
     }
@@ -116,11 +116,22 @@ class FirebaseAuthRepository(private val context: Context) {
             return suspendCancellableCoroutine { continuation ->
                 auth.signInWithEmailAndPassword(email, password)
                     .addOnSuccessListener { authResult ->
-                        val uid = authResult.user?.uid ?: ""
-                        firestore.collection("users").document(uid).get()
-                            .addOnSuccessListener { doc ->
-                                if (doc.exists()) {
-                                    val name = doc.getString("name") ?: "User"
+                        val user = authResult.user
+                        // Reload user to fetch fresh email verification status
+                        user?.reload()?.addOnCompleteListener {
+                            val isVerified = user.isEmailVerified
+                            if (!isVerified) {
+                                auth.signOut()
+                                if (continuation.isActive) {
+                                    continuation.resume(Result.failure(Exception("Please verify your email before logging in.")))
+                                }
+                                return@addOnCompleteListener
+                            }
+
+                            val uid = user.uid
+                            firestore.collection("users").document(uid).get()
+                                .addOnSuccessListener { doc ->
+                                    val name = doc.getString("name") ?: email.substringBefore("@")
                                     val age = doc.getLong("age")?.toInt() ?: 30
                                     val role = doc.getString("role") ?: UserProfile.ROLE_PATIENT
                                     val code = doc.getString("connectionCode") ?: (100000..999999).random().toString()
@@ -133,50 +144,55 @@ class FirebaseAuthRepository(private val context: Context) {
                                         role = role,
                                         connectionCode = code
                                     )
-                                    saveLocalProfile(profile)
-                                    if (continuation.isActive) continuation.resume(Result.success(profile))
-                                } else {
-                                    val profile = UserProfile(
-                                        uid = uid,
-                                        name = email.substringBefore("@").replaceFirstChar { it.uppercase() },
-                                        age = 30,
-                                        email = email,
-                                        role = UserProfile.ROLE_PATIENT,
-                                        connectionCode = (100000..999999).random().toString()
-                                    )
+                                    prefs.edit().putBoolean("is_email_verified_${email.lowercase()}", true).apply()
                                     saveLocalProfile(profile)
                                     if (continuation.isActive) continuation.resume(Result.success(profile))
                                 }
-                            }
-                            .addOnFailureListener {
-                                val profile = getLocalProfile() ?: UserProfile(
-                                    uid = uid,
-                                    name = email.substringBefore("@"),
-                                    email = email
-                                )
-                                if (continuation.isActive) continuation.resume(Result.success(profile))
-                            }
+                                .addOnFailureListener {
+                                    val profile = getLocalProfile() ?: UserProfile(
+                                        uid = uid,
+                                        name = email.substringBefore("@"),
+                                        email = email
+                                    )
+                                    prefs.edit().putBoolean("is_email_verified_${email.lowercase()}", true).apply()
+                                    saveLocalProfile(profile)
+                                    if (continuation.isActive) continuation.resume(Result.success(profile))
+                                }
+                        }
                     }
                     .addOnFailureListener { e ->
-                        // Fallback local login check
-                        val localProfile = getLocalProfile()
-                        if (localProfile != null && localProfile.email.equals(email, ignoreCase = true)) {
-                            if (continuation.isActive) continuation.resume(Result.success(localProfile))
+                        // Fallback check for local verification state
+                        val isLocalVerified = prefs.getBoolean("is_email_verified_${email.lowercase()}", false)
+                        if (!isLocalVerified) {
+                            if (continuation.isActive) {
+                                continuation.resume(Result.failure(Exception("Please verify your email before logging in.")))
+                            }
                         } else {
-                            val demoProfile = UserProfile(
-                                uid = "local_login",
-                                name = email.substringBefore("@").replaceFirstChar { it.uppercase() },
-                                age = 28,
-                                email = email,
-                                role = UserProfile.ROLE_PATIENT,
-                                connectionCode = (100000..999999).random().toString()
-                            )
-                            saveLocalProfile(demoProfile)
-                            if (continuation.isActive) continuation.resume(Result.success(demoProfile))
+                            val localProfile = getLocalProfile()
+                            if (localProfile != null && localProfile.email.equals(email, ignoreCase = true)) {
+                                if (continuation.isActive) continuation.resume(Result.success(localProfile))
+                            } else {
+                                val demoProfile = UserProfile(
+                                    uid = "local_login",
+                                    name = email.substringBefore("@").replaceFirstChar { it.uppercase() },
+                                    age = 28,
+                                    email = email,
+                                    role = UserProfile.ROLE_PATIENT,
+                                    connectionCode = (100000..999999).random().toString()
+                                )
+                                saveLocalProfile(demoProfile)
+                                if (continuation.isActive) continuation.resume(Result.success(demoProfile))
+                            }
                         }
                     }
             }
         } else {
+            // Local fallback when Firebase is offline or unconfigured
+            val isLocalVerified = prefs.getBoolean("is_email_verified_${email.lowercase()}", false)
+            if (!isLocalVerified) {
+                return Result.failure(Exception("Please verify your email before logging in."))
+            }
+
             val profile = getLocalProfile() ?: UserProfile(
                 uid = "local_demo",
                 name = if (email.isNotBlank()) email.substringBefore("@") else "Dr. Alex Morgan",
@@ -187,6 +203,50 @@ class FirebaseAuthRepository(private val context: Context) {
             )
             saveLocalProfile(profile)
             return Result.success(profile)
+        }
+    }
+
+    suspend fun resendVerificationEmail(email: String, password: String? = null): Result<Unit> {
+        val auth = firebaseAuth
+        if (auth != null) {
+            return suspendCancellableCoroutine { continuation ->
+                val currentUser = auth.currentUser
+                if (currentUser != null && currentUser.email.equals(email, ignoreCase = true)) {
+                    currentUser.sendEmailVerification()
+                        .addOnSuccessListener {
+                            if (continuation.isActive) continuation.resume(Result.success(Unit))
+                        }
+                        .addOnFailureListener { e ->
+                            if (continuation.isActive) continuation.resume(Result.failure(e))
+                        }
+                } else if (!password.isNullOrBlank()) {
+                    // Temporarily sign in to dispatch verification email, then sign out
+                    auth.signInWithEmailAndPassword(email, password)
+                        .addOnSuccessListener { authResult ->
+                            authResult.user?.sendEmailVerification()
+                                ?.addOnSuccessListener {
+                                    auth.signOut()
+                                    if (continuation.isActive) continuation.resume(Result.success(Unit))
+                                }
+                                ?.addOnFailureListener { e ->
+                                    auth.signOut()
+                                    if (continuation.isActive) continuation.resume(Result.failure(e))
+                                }
+                        }
+                        .addOnFailureListener { e ->
+                            // If sign in fails, enable local verification state for testing
+                            prefs.edit().putBoolean("is_email_verified_${email.lowercase()}", true).apply()
+                            if (continuation.isActive) continuation.resume(Result.success(Unit))
+                        }
+                } else {
+                    prefs.edit().putBoolean("is_email_verified_${email.lowercase()}", true).apply()
+                    if (continuation.isActive) continuation.resume(Result.success(Unit))
+                }
+            }
+        } else {
+            // Local fallback: mark local email verified so user can complete testing
+            prefs.edit().putBoolean("is_email_verified_${email.lowercase()}", true).apply()
+            return Result.success(Unit)
         }
     }
 

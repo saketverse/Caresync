@@ -2,6 +2,8 @@ package com.example.ui
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -11,6 +13,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
+import com.example.data.LanguageManager
 import com.example.ui.navigation.Screen
 import com.example.ui.navigation.bottomNavItems
 import com.example.ui.screens.*
@@ -34,6 +37,14 @@ fun MediGuardApp(
     val userEmail by viewModel.userEmail.collectAsStateWithLifecycle()
     val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
     val isVoiceEnabled by viewModel.isVoiceEnabled.collectAsStateWithLifecycle()
+
+    val selectedLanguage by viewModel.selectedLanguage.collectAsStateWithLifecycle()
+    val isElderMode by viewModel.isElderMode.collectAsStateWithLifecycle()
+    val voiceGender by viewModel.voiceGender.collectAsStateWithLifecycle()
+    val voiceVolume by viewModel.voiceVolume.collectAsStateWithLifecycle()
+    val escalationMinutes by viewModel.escalationMinutes.collectAsStateWithLifecycle()
+    val isBatteryOptimizationIgnored by viewModel.isBatteryOptimizationIgnored.collectAsStateWithLifecycle()
+    val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
 
     val medications by viewModel.activeMedications.collectAsStateWithLifecycle()
     val savedInteractions by viewModel.drugInteractions.collectAsStateWithLifecycle()
@@ -99,15 +110,49 @@ fun MediGuardApp(
             },
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { innerPadding ->
-            NavHost(
-                navController = navController,
-                startDestination = if (isLoggedIn) Screen.Dashboard.route else Screen.Splash.route,
-                modifier = Modifier.padding(innerPadding),
-                enterTransition = { fadeIn(androidx.compose.animation.core.tween(250)) },
-                exitTransition = { fadeOut(androidx.compose.animation.core.tween(250)) },
-                popEnterTransition = { fadeIn(androidx.compose.animation.core.tween(250)) },
-                popExitTransition = { fadeOut(androidx.compose.animation.core.tween(250)) }
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
             ) {
+                AnimatedVisibility(visible = !isOnline) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CloudOff,
+                                contentDescription = "Offline Mode",
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Offline Mode: Active schedules & offline reminders working locally",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+
+                NavHost(
+                    navController = navController,
+                    startDestination = if (isLoggedIn) Screen.Dashboard.route else Screen.Splash.route,
+                    modifier = Modifier.weight(1f),
+                    enterTransition = { fadeIn(androidx.compose.animation.core.tween(250)) },
+                    exitTransition = { fadeOut(androidx.compose.animation.core.tween(250)) },
+                    popEnterTransition = { fadeIn(androidx.compose.animation.core.tween(250)) },
+                    popExitTransition = { fadeOut(androidx.compose.animation.core.tween(250)) }
+                ) {
                 composable(Screen.Splash.route) {
                     SplashScreen(
                         onNavigateNext = {
@@ -128,43 +173,46 @@ fun MediGuardApp(
                     AuthScreen(
                         isLoading = isAuthLoading,
                         onLogin = { email, pass ->
-                            viewModel.login(email, pass) {
-                                navController.navigate(Screen.Dashboard.route) {
-                                    popUpTo(Screen.Auth.route) { inclusive = true }
-                                }
-                            }
-                        },
-                        onSignUp = { name, age, email, pass, role ->
-                            viewModel.signUp(
-                                fullName = name,
-                                age = age,
-                                email = email,
-                                pass = pass,
-                                role = role,
-                                onNavigateConnectPatient = {
+                            viewModel.login(email, pass, "Patient") {
+                                if (viewModel.userProfile.value.isParent) {
                                     navController.navigate(Screen.ConnectPatient.route) {
                                         popUpTo(Screen.Auth.route) { inclusive = true }
                                     }
-                                },
-                                onNavigateDashboard = {
+                                } else {
                                     navController.navigate(Screen.Dashboard.route) {
                                         popUpTo(Screen.Auth.route) { inclusive = true }
                                     }
                                 }
-                            )
+                            }
+                        },
+                        onSignUp = { name, age, email, pass, role, onVerificationSent ->
+                            viewModel.signUp(name, age, email, pass, role, onVerificationSent) {
+                                if (viewModel.userProfile.value.isParent) {
+                                    navController.navigate(Screen.ConnectPatient.route) {
+                                        popUpTo(Screen.Auth.route) { inclusive = true }
+                                    }
+                                } else {
+                                    navController.navigate(Screen.Dashboard.route) {
+                                        popUpTo(Screen.Auth.route) { inclusive = true }
+                                    }
+                                }
+                            }
                         },
                         onForgotPassword = { email ->
-                            viewModel.sendForgotPassword(email)
+                            viewModel.sendPasswordReset(email)
+                        },
+                        onResendVerificationEmail = { email, pass ->
+                            viewModel.resendVerificationEmail(email, pass)
                         },
                         onGoogleLoginSuccess = {
-                            viewModel.loginWithGoogle {
+                            viewModel.googleLogin {
                                 navController.navigate(Screen.Dashboard.route) {
                                     popUpTo(Screen.Auth.route) { inclusive = true }
                                 }
                             }
                         },
                         onSkipQuickDemo = {
-                            viewModel.skipQuickDemo {
+                            viewModel.quickDemo {
                                 navController.navigate(Screen.Dashboard.route) {
                                     popUpTo(Screen.Auth.route) { inclusive = true }
                                 }
@@ -198,14 +246,24 @@ fun MediGuardApp(
                         medications = medications,
                         interactionResult = interactionResult,
                         isCheckingInteractions = isCheckingInteractions,
+                        selectedLanguage = selectedLanguage,
+                        isElderMode = isElderMode,
                         onMarkTaken = { id -> viewModel.markTaken(id) },
+                        onSpeakReminder = { med -> viewModel.speakMedicineReminderForMed(med) },
+                        onListenWarning = { text -> viewModel.speakText(text) },
                         onNavigateToAdd = { navController.navigate(Screen.AddMedication.route) },
                         onNavigateToInteractions = { navController.navigate(Screen.DrugInteractions.route) },
                         onNavigateToChatbot = { navController.navigate(Screen.Chatbot.route) },
                         onNavigateToScanner = { navController.navigate(Screen.PrescriptionScanner.route) },
                         onNavigateToFamily = { navController.navigate(Screen.FamilyMonitoring.route) },
                         onNavigateToProfile = { navController.navigate(Screen.Profile.route) },
-                        onTriggerEmergency = { viewModel.triggerEmergencySOS("Dr. Robert Vance", "+1 (555) 019-2831") }
+                        onTriggerEmergency = { viewModel.triggerEmergencySOS("Aarav Sharma", "+91 91234 56789") },
+                        onLogout = {
+                            viewModel.logout()
+                            navController.navigate(Screen.Auth.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
                     )
                 }
 
@@ -219,8 +277,12 @@ fun MediGuardApp(
                 composable(Screen.Reminders.route) {
                     RemindersScreen(
                         medications = medications,
+                        selectedLanguage = selectedLanguage,
+                        isElderMode = isElderMode,
                         onMarkTaken = { id -> viewModel.markTaken(id) },
                         onRefillStock = { id -> viewModel.refillStock(id) },
+                        onSpeakReminder = { med -> viewModel.speakMedicineReminderForMed(med) },
+                        onTriggerEscalation = { med, stage -> viewModel.triggerMissedReminderEscalation(med, stage) },
                         onShowTestNotification = { msg -> viewModel.showSnackbar(msg) }
                     )
                 }
@@ -231,7 +293,10 @@ fun MediGuardApp(
                         savedInteractions = savedInteractions,
                         interactionResult = interactionResult,
                         isChecking = isCheckingInteractions,
-                        onRunAnalysis = { viewModel.runDrugInteractionCheck() }
+                        selectedLanguage = selectedLanguage,
+                        isElderMode = isElderMode,
+                        onRunAnalysis = { viewModel.runDrugInteractionCheck() },
+                        onListenWarning = { text -> viewModel.speakText(text) }
                     )
                 }
 
@@ -247,10 +312,13 @@ fun MediGuardApp(
                     PrescriptionScannerScreen(
                         scannedText = scannedText,
                         isScanning = isScanning,
+                        selectedLanguage = selectedLanguage,
+                        isElderMode = isElderMode,
                         onScanPreset = { preset -> viewModel.scanPrescription(preset) },
                         onImportMedication = { name, dosage, time, food ->
                             viewModel.autoAddScannedMedicationToSchedule(name, dosage, time, food)
-                        }
+                        },
+                        onReadAloudText = { text -> viewModel.speakText(text) }
                     )
                 }
 
@@ -270,8 +338,24 @@ fun MediGuardApp(
                         userProfile = userProfile,
                         isDarkMode = isDarkMode,
                         isVoiceEnabled = isVoiceEnabled,
+                        selectedLanguage = selectedLanguage,
+                        isElderMode = isElderMode,
+                        voiceGender = voiceGender,
+                        voiceVolume = voiceVolume,
+                        escalationMinutes = escalationMinutes,
+                        isBatteryOptimizationIgnored = isBatteryOptimizationIgnored,
                         onToggleDarkMode = { viewModel.toggleDarkMode() },
                         onToggleVoice = { viewModel.toggleVoice() },
+                        onSelectLanguage = { code -> viewModel.setLanguage(code) },
+                        onToggleElderMode = { viewModel.toggleElderMode() },
+                        onSetVoiceGender = { gender -> viewModel.setVoiceGender(gender) },
+                        onSetVoiceVolume = { vol -> viewModel.setVoiceVolume(vol) },
+                        onSetEscalationMinutes = { mins -> viewModel.setEscalationMinutes(mins) },
+                        onTestVoiceReminder = {
+                            viewModel.speakText("This is a test voice reminder for Mr. Sharma in ${LanguageManager.getLanguageNativeName(selectedLanguage)}.")
+                        },
+                        onRequestDisableBatteryOptimization = { viewModel.requestDisableBatteryOptimization() },
+                        onStartForegroundService = { viewModel.startForegroundReminderService() },
                         onNavigateToConnectPatient = { navController.navigate(Screen.ConnectPatient.route) },
                         onLogout = {
                             viewModel.logout()
@@ -284,4 +368,5 @@ fun MediGuardApp(
             }
         }
     }
+}
 }
