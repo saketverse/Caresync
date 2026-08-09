@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for authentication & authorization
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isConnectedParent(patientId) {
+      return isAuthenticated() && (
+        exists(/databases/$(database)/documents/connections/$(request.auth.uid)_$(patientId)) ||
+        exists(/databases/$(database)/documents/connections/$(patientId)_$(request.auth.uid))
+      );
+    }
+
+    // --- Users Collection ---
+    match /users/{userId} {
+      // User can read their own profile, or connected parent can read linked patient profile
+      allow get: if isAuthenticated() && (isOwner(userId) || isConnectedParent(userId));
+      
+      // Allow querying users collection by connectionCode for account linkage
+      allow list: if isAuthenticated();
+      
+      // User profile creation & updates
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isConnectedParent(userId);
+      allow delete: if isOwner(userId);
+
+      // --- Nested User Subcollections ---
+      match /medications/{medId} {
+        allow read, write: if isOwner(userId) || isConnectedParent(userId);
+      }
+
+      match /medication_logs/{logId} {
+        allow read, write: if isOwner(userId) || isConnectedParent(userId);
+      }
+
+      match /reminders/{reminderId} {
+        allow read, write: if isOwner(userId) || isConnectedParent(userId);
+      }
+
+      match /chats/{chatId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // --- Top-Level Collections (UID & Relationship Enforced) ---
+
+    // Medications Collection
+    match /medications/{medId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        isConnectedParent(resource.data.userId)
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        isConnectedParent(resource.data.userId)
+      );
+    }
+
+    // Medication Logs Collection
+    match /medication_logs/{logId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        isConnectedParent(resource.data.userId)
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        isConnectedParent(resource.data.userId)
+      );
+    }
+
+    // Parent-Patient Connections Collection
+    match /connections/{connectionId} {
+      allow read: if isAuthenticated() && (
+        resource.data.parentId == request.auth.uid ||
+        resource.data.patientId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.parentId == request.auth.uid ||
+        request.resource.data.patientId == request.auth.uid
+      );
+      allow update, delete: if isAuthenticated() && (
+        resource.data.parentId == request.auth.uid ||
+        resource.data.patientId == request.auth.uid
+      );
+    }
+  }
+}

@@ -50,7 +50,7 @@ fun ConnectPatientScreen(
                     .fillMaxWidth()
                     .height(200.dp)
                     .background(
-                        color = MedicalPrimary,
+                        color = MaterialTheme.colorScheme.primary,
                         shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
                     ),
                 contentAlignment = Alignment.Center
@@ -122,7 +122,7 @@ fun ConnectPatientScreen(
                         },
                         label = { Text("6-Digit Connection Code") },
                         placeholder = { Text("e.g. 849201") },
-                        leadingIcon = { Icon(Icons.Filled.Key, contentDescription = null, tint = MedicalPrimary) },
+                        leadingIcon = { Icon(Icons.Filled.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -176,7 +176,7 @@ fun ConnectPatientScreen(
                     TextButton(onClick = onSkip) {
                         Text(
                             text = "Skip for Now (Dashboard Preview)",
-                            color = MedicalPrimary,
+                            color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Medium
                         )
                     }

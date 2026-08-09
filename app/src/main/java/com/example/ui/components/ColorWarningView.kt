@@ -127,7 +127,7 @@ fun ColorWarningView(
             }
 
             Surface(
-                color = Color.White,
+                color = MaterialTheme.colorScheme.surface,
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -136,7 +136,7 @@ fun ColorWarningView(
                         text = "$emojiPrefix $localizedDesc",
                         fontWeight = FontWeight.Bold,
                         fontSize = fontSizeTitle,
-                        color = MedicalOnSurfaceLight
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
                     if (rawSummary.isNotBlank()) {
@@ -144,7 +144,7 @@ fun ColorWarningView(
                         Text(
                             text = rawSummary,
                             fontSize = fontSizeBody,
-                            color = MedicalSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

@@ -208,7 +208,7 @@ fun InventoryCard(
                         text = "${medication.remainingTablets} / ${medication.totalTablets} left",
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,
-                        color = if (medication.remainingTablets <= 7) Color.White else MedicalPrimary,
+                        color = if (medication.remainingTablets <= 7) Color.White else MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
@@ -221,7 +221,7 @@ fun InventoryCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp),
-                color = if (medication.remainingTablets <= 7) HealthWarning else MedicalPrimary,
+                color = if (medication.remainingTablets <= 7) HealthWarning else MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
 
@@ -241,7 +241,10 @@ fun InventoryCard(
                 Button(
                     onClick = onRefill,
                     shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MedicalPrimary)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = Color.White
+                    )
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))

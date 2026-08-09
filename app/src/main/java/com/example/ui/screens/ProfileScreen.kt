@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.HealthProfile
 import com.example.data.LanguageManager
 import com.example.data.UserProfile
 import com.example.ui.theme.*
@@ -31,6 +32,7 @@ import com.example.ui.theme.*
 @Composable
 fun ProfileScreen(
     userProfile: UserProfile,
+    healthProfile: HealthProfile = HealthProfile(),
     isDarkMode: Boolean,
     isVoiceEnabled: Boolean,
     selectedLanguage: String = LanguageManager.LANG_ENGLISH,
@@ -49,12 +51,14 @@ fun ProfileScreen(
     onTestVoiceReminder: () -> Unit = {},
     onRequestDisableBatteryOptimization: () -> Unit = {},
     onStartForegroundService: () -> Unit = {},
+    onUpdateHealthProfile: (HealthProfile) -> Unit = {},
     onNavigateToConnectPatient: () -> Unit,
     onLogout: () -> Unit
 ) {
     val scrollState = rememberScrollState()
     val context = LocalContext.current
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showEditHealthProfileDialog by remember { mutableStateOf(false) }
 
     if (showLogoutDialog) {
         AlertDialog(
@@ -79,6 +83,113 @@ fun ProfileScreen(
             dismissButton = {
                 OutlinedButton(
                     onClick = { showLogoutDialog = false },
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showEditHealthProfileDialog) {
+        var bloodGroupInput by remember { mutableStateOf(healthProfile.bloodGroup ?: "") }
+        var allergiesInput by remember { mutableStateOf(healthProfile.allergies ?: "") }
+        var conditionsInput by remember { mutableStateOf(healthProfile.medicalConditions ?: "") }
+        var emergencyNameInput by remember { mutableStateOf(healthProfile.emergencyContactName ?: "") }
+        var emergencyPhoneInput by remember { mutableStateOf(healthProfile.emergencyContactPhone ?: "") }
+        var notesInput by remember { mutableStateOf(healthProfile.additionalNotes ?: "") }
+
+        AlertDialog(
+            onDismissRequest = { showEditHealthProfileDialog = false },
+            title = { Text("Edit Health Profile", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = bloodGroupInput,
+                        onValueChange = { bloodGroupInput = it },
+                        label = { Text("Blood Group") },
+                        placeholder = { Text("e.g. A+, B+, O-, etc.") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = allergiesInput,
+                        onValueChange = { allergiesInput = it },
+                        label = { Text("Allergies") },
+                        placeholder = { Text("e.g., Penicillin, Latex") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = conditionsInput,
+                        onValueChange = { conditionsInput = it },
+                        label = { Text("Medical Conditions") },
+                        placeholder = { Text("e.g., Asthma, Diabetes") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = emergencyNameInput,
+                        onValueChange = { emergencyNameInput = it },
+                        label = { Text("Emergency Contact Name") },
+                        placeholder = { Text("e.g., Caregiver Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = emergencyPhoneInput,
+                        onValueChange = { emergencyPhoneInput = it },
+                        label = { Text("Emergency Contact Phone") },
+                        placeholder = { Text("e.g., +1 555-0199") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = notesInput,
+                        onValueChange = { notesInput = it },
+                        label = { Text("Additional Health Notes") },
+                        placeholder = { Text("e.g., Special instructions") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showEditHealthProfileDialog = false
+                        onUpdateHealthProfile(
+                            HealthProfile(
+                                bloodGroup = bloodGroupInput.ifBlank { null },
+                                allergies = allergiesInput.ifBlank { null },
+                                medicalConditions = conditionsInput.ifBlank { null },
+                                emergencyContactName = emergencyNameInput.ifBlank { null },
+                                emergencyContactPhone = emergencyPhoneInput.ifBlank { null },
+                                additionalNotes = notesInput.ifBlank { null }
+                            )
+                        )
+                    },
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Save Profile", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showEditHealthProfileDialog = false },
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text("Cancel")
@@ -152,14 +263,14 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Text(
-                        text = userProfile.name.ifBlank { "Mr. Sharma" },
+                        text = userProfile.name.ifBlank { "User Profile" },
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
 
                     Text(
-                        text = userProfile.email.ifBlank { "sharma.elder@health.org" },
+                        text = userProfile.email.ifBlank { "No email registered" },
                         fontSize = 13.sp,
                         color = Color.White.copy(alpha = 0.85f)
                     )
@@ -185,8 +296,8 @@ fun ProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        ProfileMetricChip("Age", "${if (userProfile.age > 0) userProfile.age else 68} yrs")
-                        ProfileMetricChip("Blood Type", "B+")
+                        ProfileMetricChip("Age", if (userProfile.age > 0) "${userProfile.age} yrs" else "Not set")
+                        ProfileMetricChip("Blood Type", healthProfile.bloodGroup?.takeIf { it.isNotBlank() } ?: "Not set")
                         ProfileMetricChip("Status", "Active")
                     }
 
@@ -204,6 +315,64 @@ fun ProfileScreen(
                         Icon(Icons.Filled.ExitToApp, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Log Out / Sign Out", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                }
+            }
+
+            // Personal Health Profile Details Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Filled.HealthAndSafety,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Personal Health Profile", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
+                        TextButton(onClick = { showEditHealthProfileDialog = true }) {
+                            Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Edit Profile", fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
+                    HorizontalDivider()
+
+                    HealthDetailRow(
+                        label = "Blood Group",
+                        value = healthProfile.bloodGroup?.takeIf { it.isNotBlank() } ?: "Not set (Tap Edit to enter)"
+                    )
+                    HealthDetailRow(
+                        label = "Allergies",
+                        value = healthProfile.allergies?.takeIf { it.isNotBlank() } ?: "None reported"
+                    )
+                    HealthDetailRow(
+                        label = "Medical Conditions",
+                        value = healthProfile.medicalConditions?.takeIf { it.isNotBlank() } ?: "None reported"
+                    )
+                    HealthDetailRow(
+                        label = "Emergency Contact",
+                        value = if (!healthProfile.emergencyContactName.isNullOrBlank()) {
+                            "${healthProfile.emergencyContactName} ${healthProfile.emergencyContactPhone?.let { "($it)" } ?: ""}"
+                        } else "Not set"
+                    )
+                    if (!healthProfile.additionalNotes.isNullOrBlank()) {
+                        HealthDetailRow(label = "Notes", value = healthProfile.additionalNotes)
                     }
                 }
             }
@@ -436,8 +605,8 @@ fun ProfileScreen(
                             onClick = onRequestDisableBatteryOptimization,
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isBatteryOptimizationIgnored) MedicalPrimaryContainer else HealthWarning,
-                                contentColor = if (isBatteryOptimizationIgnored) MedicalPrimary else Color.White
+                                containerColor = if (isBatteryOptimizationIgnored) MaterialTheme.colorScheme.primaryContainer else HealthWarning,
+                                contentColor = if (isBatteryOptimizationIgnored) MaterialTheme.colorScheme.onPrimaryContainer else Color.White
                             ),
                             modifier = Modifier.weight(1f)
                         ) {
@@ -476,7 +645,7 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.DarkMode, contentDescription = null, tint = MedicalPrimary)
+                            Icon(Icons.Filled.DarkMode, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(12.dp))
                             Text("Dark Theme Canvas", fontWeight = FontWeight.SemiBold)
                         }
@@ -500,7 +669,7 @@ fun ProfileScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
-                            Icon(Icons.Filled.Key, contentDescription = null, tint = MedicalPrimary)
+                            Icon(Icons.Filled.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "Your Patient Connection Code",
@@ -530,7 +699,7 @@ fun ProfileScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = userProfile.connectionCode.ifBlank { "849201" },
+                                    text = userProfile.connectionCode.ifBlank { "N/A" },
                                     fontSize = 24.sp,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 4.sp,
@@ -540,12 +709,12 @@ fun ProfileScreen(
                                 IconButton(
                                     onClick = {
                                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                        val clip = ClipData.newPlainText("Connection Code", userProfile.connectionCode.ifBlank { "849201" })
+                                        val clip = ClipData.newPlainText("Connection Code", userProfile.connectionCode.ifBlank { "N/A" })
                                         clipboard.setPrimaryClip(clip)
                                         Toast.makeText(context, "Connection Code Copied!", Toast.LENGTH_SHORT).show()
                                     }
                                 ) {
-                                    Icon(Icons.Filled.ContentCopy, contentDescription = "Copy Code", tint = MedicalPrimary)
+                                    Icon(Icons.Filled.ContentCopy, contentDescription = "Copy Code", tint = MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
@@ -569,8 +738,8 @@ fun ProfileScreen(
                         Icon(Icons.Filled.Phone, contentDescription = null, tint = HealthDanger)
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text("Primary Emergency Helpline", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                            Text("+91 98765 43210", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Primary Emergency Services", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text("112 / 102 (National Emergency Helpline)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
 
@@ -578,8 +747,16 @@ fun ProfileScreen(
                         Icon(Icons.Filled.Phone, contentDescription = null, tint = HealthDanger)
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text("Aarav Sharma (Son / Primary Caregiver)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                            Text("+91 91234 56789", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                text = healthProfile.emergencyContactName?.takeIf { it.isNotBlank() } ?: "Personal Caregiver / Emergency Contact (Not Set)",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                text = healthProfile.emergencyContactPhone?.takeIf { it.isNotBlank() } ?: "Tap 'Edit Profile' above to configure contact phone",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
@@ -597,6 +774,25 @@ fun ProfileScreen(
                 Text("Sign Out", fontWeight = FontWeight.Bold)
             }
         }
+    }
+}
+
+@Composable
+private fun HealthDetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = value,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.End
+        )
     }
 }
 

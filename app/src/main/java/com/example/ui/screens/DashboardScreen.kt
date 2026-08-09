@@ -64,7 +64,7 @@ fun DashboardScreen(
                             text = LanguageManager.getText("app_title", selectedLanguage),
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = MedicalPrimary
+                                color = MaterialTheme.colorScheme.primary
                             )
                         )
                         Text(
@@ -87,13 +87,13 @@ fun DashboardScreen(
                         Surface(
                             modifier = Modifier.size(38.dp),
                             shape = CircleShape,
-                            color = MedicalPrimaryContainer
+                            color = MaterialTheme.colorScheme.primaryContainer
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Filled.Person,
                                     contentDescription = "Profile",
-                                    tint = MedicalPrimary
+                                    tint = MaterialTheme.colorScheme.primary
                                 )
                             }
                         }
@@ -120,7 +120,7 @@ fun DashboardScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MedicalPrimary),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
                     Column(
@@ -214,24 +214,27 @@ fun DashboardScreen(
                         QuickActionButton(
                             title = "Add Med",
                             icon = Icons.Filled.AddCircle,
-                            containerColor = MedicalPrimaryContainer,
-                            iconColor = MedicalPrimary,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            iconColor = MaterialTheme.colorScheme.primary,
+                            textColor = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.weight(1f),
                             onClick = onNavigateToAdd
                         )
                         QuickActionButton(
                             title = "Scan Strip",
                             icon = Icons.Filled.Camera,
-                            containerColor = MedicalSecondaryContainer,
-                            iconColor = MedicalSecondary,
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            iconColor = MaterialTheme.colorScheme.secondary,
+                            textColor = MaterialTheme.colorScheme.onSecondaryContainer,
                             modifier = Modifier.weight(1f),
                             onClick = onNavigateToScanner
                         )
                         QuickActionButton(
                             title = "AI Chatbot",
                             icon = Icons.Filled.SmartToy,
-                            containerColor = MedicalTertiaryContainer,
-                            iconColor = MedicalTertiary,
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            iconColor = MaterialTheme.colorScheme.tertiary,
+                            textColor = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1f),
                             onClick = onNavigateToChatbot
                         )
@@ -240,6 +243,7 @@ fun DashboardScreen(
                             icon = Icons.Filled.People,
                             containerColor = HealthWarningContainer,
                             iconColor = HealthWarning,
+                            textColor = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1f),
                             onClick = onNavigateToFamily
                         )
@@ -326,7 +330,7 @@ fun DashboardScreen(
         AlertDialog(
             onDismissRequest = { showEmergencyDialog = false },
             title = { Text("Send Emergency SOS Alert?") },
-            text = { Text("This will send an emergency notification to your registered caregiver (Aarav Sharma) with your location and medication status.") },
+            text = { Text("This will send an emergency notification to your registered emergency contact with your location and medication status.") },
             confirmButton = {
                 Button(
                     onClick = {
@@ -404,6 +408,7 @@ private fun QuickActionButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     containerColor: Color,
     iconColor: Color,
+    textColor: Color = iconColor,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
@@ -422,7 +427,7 @@ private fun QuickActionButton(
                 title,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 11.sp,
-                color = iconColor,
+                color = textColor,
                 maxLines = 1
             )
         }

@@ -29,32 +29,44 @@ class SmartReminderForegroundService : Service() {
         const val EXTRA_DOSAGE = "extra_dosage"
 
         fun startService(context: Context) {
-            val intent = Intent(context, SmartReminderForegroundService::class.java).apply {
-                action = ACTION_START_SERVICE
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                val intent = Intent(context, SmartReminderForegroundService::class.java).apply {
+                    action = ACTION_START_SERVICE
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
 
         fun stopService(context: Context) {
-            val intent = Intent(context, SmartReminderForegroundService::class.java).apply {
-                action = ACTION_STOP_SERVICE
+            try {
+                val intent = Intent(context, SmartReminderForegroundService::class.java).apply {
+                    action = ACTION_STOP_SERVICE
+                }
+                context.stopService(intent)
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-            context.stopService(intent)
         }
 
         fun triggerVoiceAlert(context: Context, text: String) {
-            val intent = Intent(context, SmartReminderForegroundService::class.java).apply {
-                action = ACTION_TRIGGER_VOICE_ALERT
-                putExtra(EXTRA_ALERT_TEXT, text)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                val intent = Intent(context, SmartReminderForegroundService::class.java).apply {
+                    action = ACTION_TRIGGER_VOICE_ALERT
+                    putExtra(EXTRA_ALERT_TEXT, text)
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
@@ -84,8 +96,20 @@ class SmartReminderForegroundService : Service() {
             }
         }
 
-        val notification = buildForegroundNotification()
-        startForeground(NOTIFICATION_ID, notification)
+        try {
+            val notification = buildForegroundNotification()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         return START_STICKY
     }

@@ -57,7 +57,7 @@ fun DrugInteractionsScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MedicalPrimary)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp)
@@ -102,7 +102,7 @@ fun DrugInteractionsScreen(
                         enabled = !isChecking,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.White,
-                            contentColor = MedicalPrimary
+                            contentColor = MaterialTheme.colorScheme.primary
                         ),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
@@ -182,7 +182,7 @@ fun DrugInteractionsScreen(
                                     text = "${interaction.drugA} + ${interaction.drugB}",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp,
-                                    color = MedicalPrimary
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                                 Surface(
                                     color = when (interaction.riskLevel) {

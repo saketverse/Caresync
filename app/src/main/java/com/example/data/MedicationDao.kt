@@ -51,4 +51,16 @@ interface MedicationDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertInteraction(interaction: DrugInteraction)
+    // --- Clear All User Data ---
+    @Query("DELETE FROM medications")
+    suspend fun deleteAllMedications()
+
+    @Query("DELETE FROM medication_logs")
+    suspend fun deleteAllLogs()
+
+    @Query("DELETE FROM family_members")
+    suspend fun deleteAllFamilyMembers()
+
+    @Query("DELETE FROM drug_interactions")
+    suspend fun deleteAllInteractions()
 }

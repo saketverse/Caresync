@@ -59,7 +59,7 @@ fun FamilyMonitoringScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MedicalTertiaryContainer)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
                 ) {
                     Row(
                         modifier = Modifier.padding(20.dp),
@@ -68,7 +68,7 @@ fun FamilyMonitoringScreen(
                         Icon(
                             imageVector = Icons.Filled.FamilyRestroom,
                             contentDescription = null,
-                            tint = MedicalTertiary,
+                            tint = MaterialTheme.colorScheme.tertiary,
                             modifier = Modifier.size(40.dp)
                         )
                         Spacer(modifier = Modifier.width(14.dp))
@@ -171,14 +171,14 @@ fun FamilyMemberCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
                         shape = CircleShape,
-                        color = MedicalPrimaryContainer,
+                        color = MaterialTheme.colorScheme.primaryContainer,
                         modifier = Modifier.size(44.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Filled.Person,
                                 contentDescription = null,
-                                tint = MedicalPrimary,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(24.dp)
                             )
                         }
@@ -211,7 +211,7 @@ fun FamilyMemberCard(
                 }
                 Column {
                     Text("Last Status", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(member.lastDoseStatus, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = MedicalPrimary)
+                    Text(member.lastDoseStatus, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
                 }
             }
 

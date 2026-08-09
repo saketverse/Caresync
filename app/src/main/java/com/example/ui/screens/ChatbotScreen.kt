@@ -56,14 +56,14 @@ fun ChatbotScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
                             shape = CircleShape,
-                            color = MedicalPrimaryContainer,
+                            color = MaterialTheme.colorScheme.primaryContainer,
                             modifier = Modifier.size(36.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Filled.SmartToy,
                                     contentDescription = null,
-                                    tint = MedicalPrimary,
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
@@ -179,7 +179,10 @@ fun ChatbotScreen(
                             }
                         },
                         enabled = inputText.isNotBlank() && !isLoading,
-                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = MedicalPrimary)
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = Color.White
+                        )
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Send,
@@ -204,7 +207,7 @@ fun ChatBubble(message: ChatMessage) {
         if (!isUser) {
             Surface(
                 shape = CircleShape,
-                color = MedicalPrimaryContainer,
+                color = MaterialTheme.colorScheme.primaryContainer,
                 modifier = Modifier
                     .size(32.dp)
                     .align(Alignment.Top)
@@ -213,7 +216,7 @@ fun ChatBubble(message: ChatMessage) {
                     Icon(
                         imageVector = Icons.Filled.SmartToy,
                         contentDescription = null,
-                        tint = MedicalPrimary,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -229,7 +232,8 @@ fun ChatBubble(message: ChatMessage) {
                 bottomEnd = if (isUser) 4.dp else 16.dp
             ),
             colors = CardDefaults.cardColors(
-                containerColor = if (isUser) MedicalPrimary else MaterialTheme.colorScheme.surface
+                containerColor = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                contentColor = if (isUser) Color.White else MaterialTheme.colorScheme.onSurface
             ),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
             modifier = Modifier.widthIn(max = 280.dp)

@@ -2,12 +2,12 @@ package com.example.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,10 +17,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.ui.theme.*
 
 @Composable
@@ -36,7 +39,7 @@ fun SplashScreen(
 
     LaunchedEffect(Unit) {
         startAnimation = true
-        kotlinx.coroutines.delay(2000)
+        kotlinx.coroutines.delay(2200)
         onNavigateNext()
     }
 
@@ -59,23 +62,23 @@ fun SplashScreen(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(32.dp)
+                .padding(28.dp)
                 .scale(scaleAnim)
         ) {
-            // Icon Badge
+            // CareSync Logo Display Card
             Surface(
                 modifier = Modifier
-                    .size(110.dp)
+                    .size(160.dp)
                     .clip(CircleShape),
-                color = Color.White.copy(alpha = 0.15f),
-                shadowElevation = 12.dp
+                color = Color.White,
+                shadowElevation = 16.dp
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Filled.HealthAndSafety,
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(16.dp)) {
+                    Image(
+                        painter = painterResource(id = R.drawable.caresync_logo),
                         contentDescription = "CareSync Logo",
-                        tint = Color.White,
-                        modifier = Modifier.size(68.dp)
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
             }
@@ -85,7 +88,7 @@ fun SplashScreen(
             Text(
                 text = "CareSync",
                 style = MaterialTheme.typography.headlineLarge.copy(
-                    fontSize = 34.sp,
+                    fontSize = 36.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
@@ -98,21 +101,21 @@ fun SplashScreen(
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Shield,
                         contentDescription = null,
                         tint = HealthSafe,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "AI Safety Assistant",
                         color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
@@ -129,7 +132,7 @@ fun SplashScreen(
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(44.dp))
 
             Button(
                 onClick = onNavigateNext,
@@ -151,3 +154,4 @@ fun SplashScreen(
         }
     }
 }
+

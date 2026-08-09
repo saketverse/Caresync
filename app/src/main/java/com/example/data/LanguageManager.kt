@@ -75,7 +75,7 @@ object LanguageManager {
         dosage: String,
         langCode: String
     ): String {
-        val name = userName.ifBlank { "Saket" }
+        val name = userName.ifBlank { "User" }
         return when (langCode) {
             LANG_HINDI -> "$name, $medName $dosage लेने का समय हो गया है।"
             else -> "$name, it's time to take $medName $dosage."
@@ -88,7 +88,7 @@ object LanguageManager {
         time: String,
         langCode: String
     ): String {
-        val name = patientName.ifBlank { "Saket" }
+        val name = patientName.ifBlank { "Patient" }
         return when (langCode) {
             LANG_HINDI -> "$name ने $time की दवा ($medName) नहीं ली।"
             else -> "Caregiver Alert: $name missed their $time medicine ($medName)."

@@ -94,7 +94,7 @@ fun PillOrganizerSection(
                     Icon(
                         imageVector = Icons.Filled.GridView,
                         contentDescription = null,
-                        tint = MedicalPrimary,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(28.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
@@ -103,25 +103,25 @@ fun PillOrganizerSection(
                             text = LanguageManager.getText("pill_organizer", selectedLanguage),
                             fontWeight = FontWeight.Bold,
                             fontSize = fontSizeHeading,
-                            color = MedicalOnSurfaceLight
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = if (isElderMode) "Large-print easy daily schedule" else "Grouped daily dosage manager",
                             fontSize = fontSizeBody,
-                            color = MedicalSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
                 Surface(
-                    color = MedicalPrimaryContainer,
+                    color = MaterialTheme.colorScheme.primaryContainer,
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
                         text = "${medications.count { it.isTakenToday }}/${medications.size} Done",
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
-                        color = MedicalPrimary,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                     )
                 }
@@ -132,7 +132,7 @@ fun PillOrganizerSection(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                color = MedicalSurfaceLight
+                color = MaterialTheme.colorScheme.surface
             ) {
                 Box(
                     modifier = Modifier.padding(24.dp),
@@ -142,7 +142,7 @@ fun PillOrganizerSection(
                         text = "No medications scheduled for today.",
                         fontSize = fontSizeTitle,
                         fontWeight = FontWeight.SemiBold,
-                        color = MedicalSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -160,18 +160,18 @@ fun PillOrganizerSection(
                             text = timeBucketTitle,
                             fontWeight = FontWeight.Bold,
                             fontSize = fontSizeTitle,
-                            color = MedicalOnSurfaceLight
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Surface(
-                            color = MedicalSecondaryContainer,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
                                 text = "${medsInBucket.size} Item(s)",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MedicalSecondary,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
                         }
@@ -182,13 +182,13 @@ fun PillOrganizerSection(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .border(
-                                    width = if (med.isTakenToday) 1.dp else 2.dp,
-                                    color = if (med.isTakenToday) HealthSafeContainer else MedicalPrimary.copy(alpha = 0.5f),
+                                    width = if (med.isTakenToday) 1.dp else 1.5.dp,
+                                    color = if (med.isTakenToday) HealthSafeContainer else MaterialTheme.colorScheme.outline,
                                     shape = RoundedCornerShape(18.dp)
                                 ),
                             shape = RoundedCornerShape(18.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = if (med.isTakenToday) HealthSafeContainer.copy(alpha = 0.4f) else MedicalSurfaceLight
+                                containerColor = if (med.isTakenToday) HealthSafeContainer.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surface
                             )
                         ) {
                             Column(
@@ -208,14 +208,14 @@ fun PillOrganizerSection(
                                     ) {
                                         Surface(
                                             shape = RoundedCornerShape(12.dp),
-                                            color = if (med.isTakenToday) HealthSafeContainer else MedicalPrimaryContainer,
+                                            color = if (med.isTakenToday) HealthSafeContainer else MaterialTheme.colorScheme.primaryContainer,
                                             modifier = Modifier.size(if (isElderMode) 52.dp else 44.dp)
                                         ) {
                                             Box(contentAlignment = Alignment.Center) {
                                                 Icon(
                                                     imageVector = if (med.isTakenToday) Icons.Filled.CheckCircle else Icons.Filled.Medication,
                                                     contentDescription = null,
-                                                    tint = if (med.isTakenToday) HealthSafe else MedicalPrimary,
+                                                    tint = if (med.isTakenToday) HealthSafe else MaterialTheme.colorScheme.primary,
                                                     modifier = Modifier.size(if (isElderMode) 32.dp else 24.dp)
                                                 )
                                             }
@@ -228,18 +228,18 @@ fun PillOrganizerSection(
                                                 text = med.name,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = fontSizeTitle,
-                                                color = MedicalOnSurfaceLight
+                                                color = MaterialTheme.colorScheme.onSurface
                                             )
                                             Text(
                                                 text = "Dosage: ${med.dosage} • ${med.beforeOrAfterFood}",
                                                 fontSize = fontSizeBody,
                                                 fontWeight = FontWeight.Medium,
-                                                color = MedicalSecondary
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                             Text(
                                                 text = "Time: ${med.timeOfConsumption}",
                                                 fontSize = fontSizeBody,
-                                                color = MedicalPrimary,
+                                                color = MaterialTheme.colorScheme.primary,
                                                 fontWeight = FontWeight.SemiBold
                                             )
                                         }
@@ -248,13 +248,13 @@ fun PillOrganizerSection(
                                     IconButton(
                                         onClick = { onSpeakReminder(med) },
                                         modifier = Modifier
-                                            .background(MedicalPrimaryContainer, RoundedCornerShape(10.dp))
+                                            .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(10.dp))
                                             .size(44.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Filled.VolumeUp,
                                             contentDescription = "Read Aloud",
-                                            tint = MedicalPrimary
+                                            tint = MaterialTheme.colorScheme.primary
                                         )
                                     }
                                 }
@@ -268,7 +268,7 @@ fun PillOrganizerSection(
                                         Text(
                                             text = "Note: ${med.instructions}",
                                             fontSize = 12.sp,
-                                            color = MedicalSecondary,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.weight(1f)
                                         )
                                     } else {
@@ -278,7 +278,8 @@ fun PillOrganizerSection(
                                     Button(
                                         onClick = { onMarkTaken(med.id) },
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (med.isTakenToday) HealthSafe else MedicalPrimary
+                                            containerColor = if (med.isTakenToday) HealthSafe else MaterialTheme.colorScheme.primary,
+                                            contentColor = Color.White
                                         ),
                                         shape = RoundedCornerShape(12.dp),
                                         modifier = Modifier.height(if (isElderMode) 52.dp else 44.dp)

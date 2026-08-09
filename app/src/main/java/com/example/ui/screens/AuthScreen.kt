@@ -1,9 +1,12 @@
 package com.example.ui.screens
 
+import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -13,13 +16,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.data.UserProfile
 import com.example.ui.theme.*
 
@@ -31,8 +39,7 @@ fun AuthScreen(
     onSignUp: (String, Int, String, String, String, () -> Unit) -> Unit, // fullName, age, email, password, role, onVerificationSent
     onForgotPassword: (String) -> Unit,
     onResendVerificationEmail: (String, String?) -> Unit,
-    onGoogleLoginSuccess: () -> Unit,
-    onSkipQuickDemo: () -> Unit
+    onContinueWithGoogle: (Context) -> Unit
 ) {
     var isSignUp by remember { mutableStateOf(false) }
 
@@ -50,6 +57,7 @@ fun AuthScreen(
     var validationError by remember { mutableStateOf<String?>(null) }
     var verificationPendingMessage by remember { mutableStateOf<String?>(null) }
 
+    val context = LocalContext.current
     val scrollState = rememberScrollState()
 
     Scaffold(
@@ -68,7 +76,7 @@ fun AuthScreen(
                     .fillMaxWidth()
                     .height(190.dp)
                     .background(
-                        color = MedicalPrimary,
+                        color = MaterialTheme.colorScheme.primary,
                         shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
                     ),
                 contentAlignment = Alignment.Center
@@ -77,13 +85,22 @@ fun AuthScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.padding(16.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.HealthAndSafety,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(52.dp)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Surface(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape),
+                        color = Color.White
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(8.dp)) {
+                            Image(
+                                painter = painterResource(id = R.drawable.caresync_logo),
+                                contentDescription = "CareSync Logo",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "CareSync",
                         style = MaterialTheme.typography.headlineMedium.copy(
@@ -92,7 +109,7 @@ fun AuthScreen(
                         )
                     )
                     Text(
-                        text = "Firebase Auth & Medication Safety",
+                        text = "Medication Safety & Caregiver Platform",
                         style = MaterialTheme.typography.bodyMedium.copy(
                             color = Color.White.copy(alpha = 0.85f)
                         )
@@ -256,7 +273,7 @@ fun AuthScreen(
                                 value = fullName,
                                 onValueChange = { fullName = it },
                                 label = { Text("Full Name") },
-                                leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null, tint = MedicalPrimary) },
+                                leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(12.dp)
@@ -270,7 +287,7 @@ fun AuthScreen(
                                     if (it.length <= 3 && it.all { c -> c.isDigit() }) ageText = it
                                 },
                                 label = { Text("Age") },
-                                leadingIcon = { Icon(Icons.Filled.Numbers, contentDescription = null, tint = MedicalPrimary) },
+                                leadingIcon = { Icon(Icons.Filled.Numbers, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
@@ -286,7 +303,7 @@ fun AuthScreen(
                         value = email,
                         onValueChange = { email = it },
                         label = { Text("Email Address") },
-                        leadingIcon = { Icon(Icons.Filled.Email, contentDescription = null, tint = MedicalPrimary) },
+                        leadingIcon = { Icon(Icons.Filled.Email, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -299,7 +316,7 @@ fun AuthScreen(
                         value = password,
                         onValueChange = { password = it },
                         label = { Text("Password") },
-                        leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, tint = MedicalPrimary) },
+                        leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         singleLine = true,
@@ -316,7 +333,7 @@ fun AuthScreen(
                                 value = confirmPassword,
                                 onValueChange = { confirmPassword = it },
                                 label = { Text("Confirm Password") },
-                                leadingIcon = { Icon(Icons.Filled.LockReset, contentDescription = null, tint = MedicalPrimary) },
+                                leadingIcon = { Icon(Icons.Filled.LockReset, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                                 visualTransformation = PasswordVisualTransformation(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                                 singleLine = true,
@@ -378,7 +395,7 @@ fun AuthScreen(
                             ) {
                                 Text(
                                     text = "Forgot Password?",
-                                    color = MedicalPrimary,
+                                    color = MaterialTheme.colorScheme.primary,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -444,7 +461,7 @@ fun AuthScreen(
 
                     // Google Sign-In button
                     OutlinedButton(
-                        onClick = onGoogleLoginSuccess,
+                        onClick = { onContinueWithGoogle(context) },
                         enabled = !isLoading,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -478,24 +495,6 @@ fun AuthScreen(
                             color = MedicalPrimary,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    FilledTonalButton(
-                        onClick = onSkipQuickDemo,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Explore App Demo Directly",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
                         )
                     }
                 }

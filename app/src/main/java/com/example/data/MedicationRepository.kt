@@ -51,6 +51,13 @@ class MedicationRepository(private val dao: MedicationDao) {
         dao.deleteFamilyMember(member)
     }
 
+    suspend fun clearAllUserData() {
+        dao.deleteAllMedications()
+        dao.deleteAllLogs()
+        dao.deleteAllFamilyMembers()
+        dao.deleteAllInteractions()
+    }
+
     // --- Gemini AI Features ---
 
     suspend fun checkDrugInteractions(medications: List<Medication>): String {

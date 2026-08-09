@@ -14,14 +14,21 @@ private val DarkColorScheme = darkColorScheme(
     primary = MedicalPrimaryDark,
     onPrimary = MedicalOnPrimaryDark,
     primaryContainer = MedicalPrimaryContainerDark,
-    secondary = MedicalSecondary,
+    onPrimaryContainer = MedicalOnPrimaryContainerDark,
+    secondary = MedicalSecondaryDark,
+    onSecondary = MedicalOnSurfaceDark,
+    secondaryContainer = MedicalSecondaryContainerDark,
+    onSecondaryContainer = MedicalOnSecondaryContainerDark,
+    tertiary = MedicalTertiary,
+    tertiaryContainer = MedicalSecondaryContainerDark,
     background = MedicalBackgroundDark,
     surface = MedicalSurfaceDark,
     onBackground = MedicalOnSurfaceDark,
     onSurface = MedicalOnSurfaceDark,
-    onSurfaceVariant = MedicalSecondary,
+    onSurfaceVariant = MedicalSecondaryDark,
     surfaceVariant = MedicalSurfaceVariantDark,
-    outline = MedicalSurfaceVariantDark
+    outline = MedicalOutlineDark,
+    outlineVariant = MedicalSurfaceVariantDark
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -30,6 +37,7 @@ private val LightColorScheme = lightColorScheme(
     primaryContainer = MedicalPrimaryContainer,
     onPrimaryContainer = MedicalOnPrimaryContainer,
     secondary = MedicalSecondary,
+    onSecondary = MedicalOnSurfaceLight,
     secondaryContainer = MedicalSecondaryContainer,
     onSecondaryContainer = MedicalOnSecondaryContainer,
     tertiary = MedicalTertiary,
@@ -40,7 +48,8 @@ private val LightColorScheme = lightColorScheme(
     onSurface = MedicalOnSurfaceLight,
     onSurfaceVariant = MedicalSecondary,
     surfaceVariant = MedicalSurfaceVariantLight,
-    outline = MedicalSurfaceVariantLight
+    outline = MedicalOutlineLight,
+    outlineVariant = MedicalOutlineLight
 )
 
 @Composable

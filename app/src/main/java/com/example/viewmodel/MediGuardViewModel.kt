@@ -62,8 +62,26 @@ class MediGuardViewModel(application: Application) : AndroidViewModel(applicatio
     )
     val isBatteryOptimizationIgnored: StateFlow<Boolean> = _isBatteryOptimizationIgnored.asStateFlow()
 
+    // --- Authentication & User Profile State ---
+    private val savedProfile = authRepo.getLocalProfile()
+
+    private val _userProfile = MutableStateFlow<UserProfile>(
+        savedProfile ?: UserProfile(uid = "", name = "", email = "", role = UserProfile.ROLE_PATIENT)
+    )
+    val userProfile: StateFlow<UserProfile> = _userProfile.asStateFlow()
+
+    private val _healthProfile = MutableStateFlow<HealthProfile>(HealthProfile())
+    val healthProfile: StateFlow<HealthProfile> = _healthProfile.asStateFlow()
+
+    private val _isLoggedIn = MutableStateFlow(savedProfile != null && savedProfile.uid.isNotBlank())
+    val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
+
+    private val _isAuthLoading = MutableStateFlow(false)
+    val isAuthLoading: StateFlow<Boolean> = _isAuthLoading.asStateFlow()
+
     init {
         registerNetworkCallback()
+        loadHealthProfile()
         // Start persistent background foreground service to protect reminders from Android battery optimizations
         try {
             SmartReminderForegroundService.startService(application)
@@ -86,32 +104,34 @@ class MediGuardViewModel(application: Application) : AndroidViewModel(applicatio
         showSnackbar("Smart Reminder Service Safeguard Started")
     }
 
-    // --- Authentication & User Profile State ---
-    private val initialProfile = authRepo.getLocalProfile() ?: UserProfile(
-        uid = "default_user",
-        name = "Saket",
-        age = 68,
-        email = "saket.elder@health.org",
-        role = UserProfile.ROLE_PATIENT,
-        connectionCode = "849201"
-    )
+    fun loadHealthProfile() {
+        val uid = _userProfile?.value?.uid ?: ""
+        if (uid.isNotBlank()) {
+            viewModelScope.launch {
+                val hp = authRepo.fetchHealthProfile(uid)
+                _healthProfile.value = hp
+            }
+        } else {
+            _healthProfile.value = HealthProfile()
+        }
+    }
 
-    private val _userProfile = MutableStateFlow<UserProfile>(initialProfile)
-    val userProfile: StateFlow<UserProfile> = _userProfile.asStateFlow()
-
-    private val _isLoggedIn = MutableStateFlow(authRepo.getLocalProfile() != null)
-    val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
-
-    private val _isAuthLoading = MutableStateFlow(false)
-    val isAuthLoading: StateFlow<Boolean> = _isAuthLoading.asStateFlow()
+    fun updateHealthProfile(updatedProfile: HealthProfile) {
+        val uid = _userProfile?.value?.uid ?: ""
+        viewModelScope.launch {
+            _healthProfile.value = updatedProfile
+            authRepo.saveHealthProfile(uid, updatedProfile)
+            showSnackbar("Health profile updated successfully.")
+        }
+    }
 
     val userName: StateFlow<String> = _userProfile
-        .map { it.name.ifBlank { "Saket" } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Saket")
+        .map { if (it.name.isNotBlank()) it.name else if (it.email.isNotBlank()) it.email.substringBefore("@") else "User" }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "User")
 
     val userEmail: StateFlow<String> = _userProfile
         .map { it.email }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "saket.elder@health.org")
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
 
     // --- Settings & Elder Preferences State ---
     private val _isDarkMode = MutableStateFlow(settingsPrefs.getBoolean("is_dark_mode", false))
@@ -311,6 +331,7 @@ class MediGuardViewModel(application: Application) : AndroidViewModel(applicatio
                 authRepo.saveLocalProfile(profile)
                 _userProfile.value = profile
                 _isLoggedIn.value = true
+                loadHealthProfile()
                 showSnackbar("Welcome back, ${profile.name}!")
                 onSuccess()
             } else {
@@ -346,6 +367,7 @@ class MediGuardViewModel(application: Application) : AndroidViewModel(applicatio
                 authRepo.saveLocalProfile(profile)
                 _userProfile.value = profile
                 _isLoggedIn.value = true
+                loadHealthProfile()
                 showSnackbar("Account created for $fullName")
                 onVerificationSent()
                 onSuccess()
@@ -383,51 +405,45 @@ class MediGuardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun googleLogin(onSuccess: () -> Unit) {
-        viewModelScope.launch {
-            _isAuthLoading.value = true
-            val demoProfile = UserProfile(
-                uid = "google_user_101",
-                name = "Saket",
-                age = 68,
-                email = "saket.elder@health.org",
-                role = UserProfile.ROLE_PATIENT,
-                connectionCode = "849201"
-            )
-            authRepo.saveLocalProfile(demoProfile)
-            _userProfile.value = demoProfile
-            _isLoggedIn.value = true
-            _isAuthLoading.value = false
-            showSnackbar("Signed in with Google as Saket")
-            onSuccess()
-        }
+    fun isNotificationOnboardingCompleted(): Boolean {
+        return settingsPrefs.getBoolean("notification_onboarding_completed", false)
     }
 
-    fun quickDemo(onSuccess: () -> Unit) {
+    fun setNotificationOnboardingCompleted(completed: Boolean = true) {
+        settingsPrefs.edit().putBoolean("notification_onboarding_completed", completed).apply()
+    }
+
+    fun continueWithGoogle(
+        context: Context,
+        onSuccess: (isNewUser: Boolean, isParent: Boolean) -> Unit
+    ) {
         viewModelScope.launch {
             _isAuthLoading.value = true
-            val demoProfile = UserProfile(
-                uid = "demo_user_102",
-                name = "Saket",
-                age = 68,
-                email = "saket.elder@health.org",
-                role = UserProfile.ROLE_PATIENT,
-                connectionCode = "849201"
-            )
-            authRepo.saveLocalProfile(demoProfile)
-            _userProfile.value = demoProfile
-            _isLoggedIn.value = true
+            val result = authRepo.signInWithGoogleCredential(context)
             _isAuthLoading.value = false
-            showSnackbar("CareSync Demo Activated")
-            onSuccess()
+            result.onSuccess { authResult ->
+                _userProfile.value = authResult.profile
+                _isLoggedIn.value = true
+                loadHealthProfile()
+                showSnackbar("Signed in with Google as ${authResult.profile.name}")
+                onSuccess(authResult.isNewUser, authResult.profile.isParent)
+            }.onFailure { exception ->
+                _isLoggedIn.value = false
+                val message = exception.message ?: "Unable to sign in with Google. Please try again."
+                showSnackbar(message)
+            }
         }
     }
 
     fun logout() {
-        authRepo.logout()
-        _isLoggedIn.value = false
-        _userProfile.value = UserProfile()
-        showSnackbar("Signed out successfully.")
+        viewModelScope.launch {
+            authRepo.logout(getApplication())
+            repository.clearAllUserData()
+            _isLoggedIn.value = false
+            _userProfile.value = UserProfile()
+            _healthProfile.value = HealthProfile()
+            showSnackbar("Signed out successfully.")
+        }
     }
 
     fun linkParentToPatient(code: String, onSuccess: () -> Unit) {

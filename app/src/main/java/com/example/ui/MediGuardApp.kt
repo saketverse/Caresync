@@ -2,8 +2,10 @@ package com.example.ui
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -18,6 +20,7 @@ import com.example.ui.navigation.Screen
 import com.example.ui.navigation.bottomNavItems
 import com.example.ui.screens.*
 import com.example.ui.theme.MediGuardTheme
+import com.example.ui.theme.MedicalPrimary
 import com.example.viewmodel.MediGuardViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,6 +34,7 @@ fun MediGuardApp(
 
     val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle()
     val userProfile by viewModel.userProfile.collectAsStateWithLifecycle()
+    val healthProfile by viewModel.healthProfile.collectAsStateWithLifecycle()
     val isAuthLoading by viewModel.isAuthLoading.collectAsStateWithLifecycle()
 
     val userName by viewModel.userName.collectAsStateWithLifecycle()
@@ -67,6 +71,63 @@ fun MediGuardApp(
             snackbarHostState.showSnackbar(it)
             viewModel.clearSnackbar()
         }
+    }
+
+    var showNotificationOnboarding by remember { mutableStateOf(!viewModel.isNotificationOnboardingCompleted()) }
+
+    val notificationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        viewModel.setNotificationOnboardingCompleted(true)
+        if (isGranted) {
+            viewModel.showSnackbar("Notifications allowed! You will receive medication reminders.")
+        } else {
+            viewModel.showSnackbar("Notifications not granted. You can enable them in system Settings.")
+        }
+        showNotificationOnboarding = false
+    }
+
+    if (showNotificationOnboarding) {
+        AlertDialog(
+            onDismissRequest = {
+                viewModel.setNotificationOnboardingCompleted(true)
+                showNotificationOnboarding = false
+            },
+            icon = { Icon(Icons.Filled.NotificationsActive, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp)) },
+            title = { Text("Enable Medication Reminders", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "CareSync needs notifications to remind you when it is time to take your medicine.",
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                            notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            viewModel.setNotificationOnboardingCompleted(true)
+                            viewModel.showSnackbar("Notifications enabled!")
+                            showNotificationOnboarding = false
+                        }
+                    },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Allow Notifications", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.setNotificationOnboardingCompleted(true)
+                        showNotificationOnboarding = false
+                    }
+                ) {
+                    Text("Not Now")
+                }
+            }
+        )
     }
 
     MediGuardTheme(darkTheme = isDarkMode) {
@@ -204,17 +265,16 @@ fun MediGuardApp(
                         onResendVerificationEmail = { email, pass ->
                             viewModel.resendVerificationEmail(email, pass)
                         },
-                        onGoogleLoginSuccess = {
-                            viewModel.googleLogin {
-                                navController.navigate(Screen.Dashboard.route) {
-                                    popUpTo(Screen.Auth.route) { inclusive = true }
-                                }
-                            }
-                        },
-                        onSkipQuickDemo = {
-                            viewModel.quickDemo {
-                                navController.navigate(Screen.Dashboard.route) {
-                                    popUpTo(Screen.Auth.route) { inclusive = true }
+                        onContinueWithGoogle = { context ->
+                            viewModel.continueWithGoogle(context) { isNewUser, isParent ->
+                                if (isParent) {
+                                    navController.navigate(Screen.ConnectPatient.route) {
+                                        popUpTo(Screen.Auth.route) { inclusive = true }
+                                    }
+                                } else {
+                                    navController.navigate(Screen.Dashboard.route) {
+                                        popUpTo(Screen.Auth.route) { inclusive = true }
+                                    }
                                 }
                             }
                         }
@@ -257,7 +317,7 @@ fun MediGuardApp(
                         onNavigateToScanner = { navController.navigate(Screen.PrescriptionScanner.route) },
                         onNavigateToFamily = { navController.navigate(Screen.FamilyMonitoring.route) },
                         onNavigateToProfile = { navController.navigate(Screen.Profile.route) },
-                        onTriggerEmergency = { viewModel.triggerEmergencySOS("Aarav Sharma", "+91 91234 56789") },
+                        onTriggerEmergency = { viewModel.triggerEmergencySOS(healthProfile.emergencyContactName ?: "Emergency Contact", healthProfile.emergencyContactPhone ?: "112") },
                         onLogout = {
                             viewModel.logout()
                             navController.navigate(Screen.Auth.route) {
@@ -336,6 +396,7 @@ fun MediGuardApp(
                 composable(Screen.Profile.route) {
                     ProfileScreen(
                         userProfile = userProfile,
+                        healthProfile = healthProfile,
                         isDarkMode = isDarkMode,
                         isVoiceEnabled = isVoiceEnabled,
                         selectedLanguage = selectedLanguage,
@@ -352,10 +413,11 @@ fun MediGuardApp(
                         onSetVoiceVolume = { vol -> viewModel.setVoiceVolume(vol) },
                         onSetEscalationMinutes = { mins -> viewModel.setEscalationMinutes(mins) },
                         onTestVoiceReminder = {
-                            viewModel.speakText("This is a test voice reminder for Mr. Sharma in ${LanguageManager.getLanguageNativeName(selectedLanguage)}.")
+                            viewModel.speakText("This is a test voice reminder in ${LanguageManager.getLanguageNativeName(selectedLanguage)}.")
                         },
                         onRequestDisableBatteryOptimization = { viewModel.requestDisableBatteryOptimization() },
                         onStartForegroundService = { viewModel.startForegroundReminderService() },
+                        onUpdateHealthProfile = { updated -> viewModel.updateHealthProfile(updated) },
                         onNavigateToConnectPatient = { navController.navigate(Screen.ConnectPatient.route) },
                         onLogout = {
                             viewModel.logout()
