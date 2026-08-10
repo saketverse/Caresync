@@ -20,22 +20,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.DoseItem
 import com.example.data.LanguageManager
 import com.example.data.Medication
+import com.example.data.MedicationLog
 import com.example.ui.components.ColorWarningView
 import com.example.ui.components.PillOrganizerSection
 import com.example.ui.theme.*
+import com.example.util.AdherenceCalculator
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     userName: String,
     medications: List<Medication>,
+    medicationLogs: List<MedicationLog> = emptyList(),
+    todayDoseItems: List<DoseItem> = emptyList(),
     interactionResult: String?,
     isCheckingInteractions: Boolean,
     selectedLanguage: String = LanguageManager.LANG_ENGLISH,
     isElderMode: Boolean = true,
     onMarkTaken: (Long) -> Unit,
+    onMarkDoseTaken: (Long, String) -> Unit = { id, slot -> onMarkTaken(id) },
     onSpeakReminder: (Medication) -> Unit = {},
     onListenWarning: (String) -> Unit = {},
     onNavigateToAdd: () -> Unit,
@@ -50,9 +56,10 @@ fun DashboardScreen(
     var showEmergencyDialog by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
 
-    val takenCount = medications.count { it.isTakenToday }
+    val adherenceData = remember(medications, medicationLogs) {
+        AdherenceCalculator.calculateAdherence(medications, medicationLogs)
+    }
     val totalMeds = medications.size
-    val adherencePercent = if (totalMeds > 0) ((takenCount.toFloat() / totalMeds) * 100).toInt() else 100
     val lowStockMeds = medications.filter { it.remainingTablets <= 7 }
 
     Scaffold(
@@ -131,19 +138,30 @@ fun DashboardScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "Daily Adherence Score",
                                     color = Color.White.copy(alpha = 0.85f),
                                     fontSize = 14.sp
                                 )
                                 Text(
-                                    text = "$adherencePercent%",
+                                    text = if (adherenceData.percentage != null) "${adherenceData.percentage}%" else "—",
                                     color = Color.White,
                                     fontSize = 32.sp,
                                     fontWeight = FontWeight.Bold
                                 )
+                                Text(
+                                    text = if (adherenceData.percentage != null) {
+                                        if (adherenceData.percentage >= 80) "Good Adherence" else "Needs Attention"
+                                    } else {
+                                        "Start taking your scheduled medicines to track adherence."
+                                    },
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    fontSize = 12.sp
+                                )
                             }
+
+                            Spacer(modifier = Modifier.width(8.dp))
 
                             Surface(
                                 shape = CircleShape,
@@ -152,9 +170,11 @@ fun DashboardScreen(
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
-                                        imageVector = Icons.Filled.CheckCircle,
+                                        imageVector = if (adherenceData.percentage == null) Icons.Filled.Info else Icons.Filled.CheckCircle,
                                         contentDescription = null,
-                                        tint = HealthSafe,
+                                        tint = if (adherenceData.percentage != null) {
+                                            if (adherenceData.percentage >= 80) HealthSafe else HealthWarning
+                                        } else Color.White,
                                         modifier = Modifier.size(32.dp)
                                     )
                                 }
@@ -174,7 +194,7 @@ fun DashboardScreen(
                             )
                             SummaryChip(
                                 label = "Doses Taken",
-                                value = "$takenCount / $totalMeds",
+                                value = "${adherenceData.takenCount} / ${if (adherenceData.totalDue > 0) adherenceData.totalDue else totalMeds}",
                                 icon = Icons.Filled.Done
                             )
                             SummaryChip(
@@ -289,11 +309,11 @@ fun DashboardScreen(
             // 5. Elder Pill Organizer Section (Morning, Afternoon, Evening, Night)
             item {
                 PillOrganizerSection(
-                    medications = medications,
+                    doseItems = todayDoseItems,
                     selectedLanguage = selectedLanguage,
                     isElderMode = isElderMode,
-                    onMarkTaken = onMarkTaken,
-                    onSpeakReminder = onSpeakReminder
+                    onMarkDoseTaken = onMarkDoseTaken,
+                    onSpeakReminder = { text -> onListenWarning(text) }
                 )
             }
 

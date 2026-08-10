@@ -10,27 +10,6 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = MedicalPrimaryDark,
-    onPrimary = MedicalOnPrimaryDark,
-    primaryContainer = MedicalPrimaryContainerDark,
-    onPrimaryContainer = MedicalOnPrimaryContainerDark,
-    secondary = MedicalSecondaryDark,
-    onSecondary = MedicalOnSurfaceDark,
-    secondaryContainer = MedicalSecondaryContainerDark,
-    onSecondaryContainer = MedicalOnSecondaryContainerDark,
-    tertiary = MedicalTertiary,
-    tertiaryContainer = MedicalSecondaryContainerDark,
-    background = MedicalBackgroundDark,
-    surface = MedicalSurfaceDark,
-    onBackground = MedicalOnSurfaceDark,
-    onSurface = MedicalOnSurfaceDark,
-    onSurfaceVariant = MedicalSecondaryDark,
-    surfaceVariant = MedicalSurfaceVariantDark,
-    outline = MedicalOutlineDark,
-    outlineVariant = MedicalSurfaceVariantDark
-)
-
 private val LightColorScheme = lightColorScheme(
     primary = MedicalPrimary,
     onPrimary = MedicalOnPrimary,
@@ -54,21 +33,10 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun MediGuardTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false, // Keep medical brand blue identity active
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = LightColorScheme,
         typography = Typography,
         content = content
     )

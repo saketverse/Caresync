@@ -10,6 +10,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
 import com.example.service.SmartReminderForegroundService
+import com.example.util.AdherenceCalculator
 import com.example.util.BatteryOptimizationManager
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -134,9 +135,6 @@ class MediGuardViewModel(application: Application) : AndroidViewModel(applicatio
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
 
     // --- Settings & Elder Preferences State ---
-    private val _isDarkMode = MutableStateFlow(settingsPrefs.getBoolean("is_dark_mode", false))
-    val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
-
     private val _isVoiceEnabled = MutableStateFlow(settingsPrefs.getBoolean("is_voice_enabled", true))
     val isVoiceEnabled: StateFlow<Boolean> = _isVoiceEnabled.asStateFlow()
 
@@ -167,11 +165,56 @@ class MediGuardViewModel(application: Application) : AndroidViewModel(applicatio
     val medicationLogs: StateFlow<List<MedicationLog>> = repository.medicationLogs
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val todayDoseItems: StateFlow<List<DoseItem>> = combine(activeMedications, medicationLogs) { meds, logs ->
+        AdherenceCalculator.calculateTodayDoseItems(meds, logs)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val familyMembers: StateFlow<List<FamilyMember>> = repository.familyMembers
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val drugInteractions: StateFlow<List<DrugInteraction>> = repository.drugInteractions
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // --- Connections & SOS Alerts State ---
+    private val _pendingConnectionRequests = MutableStateFlow<List<PatientGuardianConnection>>(emptyList())
+    val pendingConnectionRequests: StateFlow<List<PatientGuardianConnection>> = _pendingConnectionRequests.asStateFlow()
+
+    private val _acceptedGuardians = MutableStateFlow<List<PatientGuardianConnection>>(emptyList())
+    val acceptedGuardians: StateFlow<List<PatientGuardianConnection>> = _acceptedGuardians.asStateFlow()
+
+    private val _acceptedPatients = MutableStateFlow<List<PatientGuardianConnection>>(emptyList())
+    val acceptedPatients: StateFlow<List<PatientGuardianConnection>> = _acceptedPatients.asStateFlow()
+
+    private val _activeEmergencyAlerts = MutableStateFlow<List<EmergencyAlert>>(emptyList())
+    val activeEmergencyAlerts: StateFlow<List<EmergencyAlert>> = _activeEmergencyAlerts.asStateFlow()
+
+    private val _showNoGuardianDialog = MutableStateFlow(false)
+    val showNoGuardianDialog: StateFlow<Boolean> = _showNoGuardianDialog.asStateFlow()
+
+    fun dismissNoGuardianDialog() {
+        _showNoGuardianDialog.value = false
+    }
+
+    fun refreshConnectionsAndAlerts() {
+        viewModelScope.launch {
+            val uid = _userProfile.value.uid
+            val isParent = _userProfile.value.isParent
+            if (uid.isNotBlank()) {
+                if (!isParent) {
+                    _pendingConnectionRequests.value = authRepo.fetchPendingConnectionRequests(uid)
+                    _acceptedGuardians.value = authRepo.fetchAcceptedConnectionsForPatient(uid)
+                } else {
+                    _acceptedPatients.value = authRepo.fetchAcceptedPatientsForGuardian(uid)
+                    _activeEmergencyAlerts.value = authRepo.fetchActiveEmergencyAlerts(uid)
+                }
+            } else {
+                _pendingConnectionRequests.value = authRepo.fetchPendingConnectionRequests("")
+                _acceptedGuardians.value = authRepo.fetchAcceptedConnectionsForPatient("")
+                _acceptedPatients.value = authRepo.fetchAcceptedPatientsForGuardian("")
+                _activeEmergencyAlerts.value = authRepo.fetchActiveEmergencyAlerts("")
+            }
+        }
+    }
 
     // --- AI Interaction Inspector State ---
     private val _interactionResult = MutableStateFlow<String?>(null)
@@ -225,21 +268,37 @@ class MediGuardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     // --- Voice & Speech Actions ---
-    fun speakText(text: String) {
+    fun speakText(text: String, langCode: String = _selectedLanguage.value) {
         if (!_isVoiceEnabled.value) return
         updateVoiceEngineConfig()
-        voiceManager.speak(text)
+        voiceManager.speak(
+            text = text,
+            langCode = langCode,
+            onError = { warningMsg ->
+                showSnackbar(warningMsg)
+            }
+        )
     }
 
     fun speakMedicineReminderForMed(med: Medication) {
         if (!_isVoiceEnabled.value) return
         updateVoiceEngineConfig()
+        val langCode = _selectedLanguage.value
         voiceManager.speakMedicineReminder(
             userName = userName.value,
             medName = med.name,
             dosage = med.dosage,
-            langCode = _selectedLanguage.value
+            langCode = langCode,
+            onError = { warningMsg ->
+                showSnackbar(warningMsg)
+            }
         )
+    }
+
+    fun testVoice() {
+        val langCode = _selectedLanguage.value
+        val testText = LanguageManager.getTestVoiceText(langCode)
+        speakText(testText, langCode)
     }
 
     fun stopVoice() {
@@ -248,17 +307,14 @@ class MediGuardViewModel(application: Application) : AndroidViewModel(applicatio
 
     // --- Preference Setters ---
     fun setLanguage(langCode: String) {
-        val validCode = if (langCode == LanguageManager.LANG_HINDI) LanguageManager.LANG_HINDI else LanguageManager.LANG_ENGLISH
-        _selectedLanguage.value = validCode
-        settingsPrefs.edit().putString("selected_language", validCode).apply()
+        _selectedLanguage.value = langCode
+        settingsPrefs.edit().putString("selected_language", langCode).apply()
         updateVoiceEngineConfig()
-        val langName = LanguageManager.getLanguageNativeName(validCode)
+        val langName = LanguageManager.getLanguageNativeName(langCode)
         showSnackbar("Language set to $langName")
-        if (validCode == LanguageManager.LANG_HINDI) {
-            speakText("दवा लेने का समय हो गया है।")
-        } else {
-            speakText("Time to take your medicine.")
-        }
+
+        val testText = LanguageManager.getTestVoiceText(langCode)
+        speakText(testText, langCode)
     }
 
     fun toggleElderMode() {
@@ -294,11 +350,6 @@ class MediGuardViewModel(application: Application) : AndroidViewModel(applicatio
         _escalationMinutes.value = mins
         settingsPrefs.edit().putInt("escalation_minutes", mins).apply()
         showSnackbar("Caregiver escalation set to $mins minutes")
-    }
-
-    fun toggleDarkMode() {
-        _isDarkMode.value = !_isDarkMode.value
-        settingsPrefs.edit().putBoolean("is_dark_mode", _isDarkMode.value).apply()
     }
 
     fun toggleVoice() {
@@ -446,37 +497,73 @@ class MediGuardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun linkParentToPatient(code: String, onSuccess: () -> Unit) {
+    fun linkParentToPatient(code: String, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
             _isAuthLoading.value = true
-            val result = authRepo.linkParentToPatient(_userProfile.value.uid, code)
-            val updated = result.getOrNull()
-            if (updated != null) {
-                _userProfile.value = updated
-                showSnackbar("Successfully linked to patient: ${updated.connectedPatientName}")
-                onSuccess()
-            } else {
-                showSnackbar("Invalid Patient Connection Code.")
-            }
+            val profile = _userProfile.value
+            val result = authRepo.requestGuardianConnection(
+                guardianUid = profile.uid,
+                guardianName = profile.name.ifBlank { "Guardian" },
+                guardianEmail = profile.email,
+                connectionCode = code
+            )
+            result.fold(
+                onSuccess = { conn ->
+                    showSnackbar("Connection request sent to ${conn.patientName}. Awaiting patient approval.")
+                    refreshConnectionsAndAlerts()
+                    onSuccess()
+                },
+                onFailure = { e ->
+                    showSnackbar(e.message ?: "Failed to connect to patient with code $code")
+                }
+            )
             _isAuthLoading.value = false
         }
     }
 
+    fun sendGuardianConnectionRequest(code: String, onSuccess: () -> Unit = {}) {
+        linkParentToPatient(code, onSuccess)
+    }
+
+    fun sendConnectionRequest(code: String, onSuccess: () -> Unit = {}) {
+        linkParentToPatient(code, onSuccess)
+    }
+
+    fun respondToConnectionRequest(connectionId: String, accept: Boolean) {
+        viewModelScope.launch {
+            authRepo.respondToConnectionRequest(connectionId, accept)
+            showSnackbar(if (accept) "Family connection approved!" else "Connection request declined.")
+            refreshConnectionsAndAlerts()
+        }
+    }
+
+    fun resolveEmergencyAlert(alertId: String) {
+        viewModelScope.launch {
+            authRepo.resolveEmergencyAlert(alertId)
+            showSnackbar("Emergency alert marked as resolved.")
+            refreshConnectionsAndAlerts()
+        }
+    }
+
     // --- Medication Actions ---
-    fun markTaken(medicationId: Long) {
+    fun markDoseTaken(medicationId: Long, timeSlot: String, dateScheduled: String = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())) {
         if (_userProfile.value.isParent) {
             showSnackbar("⚠️ Parent / Caregiver account has read-only access.")
             return
         }
         viewModelScope.launch {
             val med = activeMedications.value.find { it.id == medicationId }
-            repository.markAsTaken(medicationId)
-            val msg = "${med?.name ?: "Medicine"} marked as taken!"
+            repository.markDoseAsTaken(medicationId, timeSlot, dateScheduled)
+            val msg = "${med?.name ?: "Medicine"} ($timeSlot) marked as taken!"
             showSnackbar(msg)
             if (_isVoiceEnabled.value) {
-                speakText("${med?.name ?: "Medicine"} taken. Good job!")
+                speakText("${med?.name ?: "Medicine"} dose taken. Good job!")
             }
         }
+    }
+
+    fun markTaken(medicationId: Long) {
+        markDoseTaken(medicationId, "08:00 AM")
     }
 
     fun refillStock(medicationId: Long) {
@@ -496,6 +583,14 @@ class MediGuardViewModel(application: Application) : AndroidViewModel(applicatio
             return
         }
         viewModelScope.launch {
+            val existing = activeMedications.value.find { 
+                it.name.trim().equals(medication.name.trim(), ignoreCase = true) && 
+                it.timeOfConsumption.trim().equals(medication.timeOfConsumption.trim(), ignoreCase = true) 
+            }
+            if (existing != null) {
+                showSnackbar("${medication.name} is already in your active schedule.")
+                return@launch
+            }
             repository.addMedication(medication)
             showSnackbar("Added ${medication.name} to medication schedule!")
             runDrugInteractionCheck()
@@ -640,10 +735,29 @@ class MediGuardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun triggerEmergencySOS(contactName: String, contactPhone: String) {
-        showSnackbar("🚨 Emergency Alert dispatched to $contactName ($contactPhone)!")
-        if (_isVoiceEnabled.value) {
-            speakText("Emergency SOS alert dispatched to $contactName.")
+    fun triggerEmergencySOS(contactName: String = "", contactPhone: String = "") {
+        viewModelScope.launch {
+            val patientUid = _userProfile.value.uid
+            val patientName = _userProfile.value.name
+            val result = authRepo.sendSOSAlert(patientUid, patientName)
+
+            result.fold(
+                onSuccess = { guardianNames ->
+                    val namesStr = guardianNames.joinToString(", ")
+                    showSnackbar("🚨 Emergency SOS Alert dispatched to $namesStr!")
+                    if (_isVoiceEnabled.value) {
+                        speakText("Emergency SOS alert dispatched to $namesStr.")
+                    }
+                },
+                onFailure = { error ->
+                    if (error.message == "NO_GUARDIAN_CONNECTED") {
+                        _showNoGuardianDialog.value = true
+                        showSnackbar("⚠️ No connected family member/guardian to receive SOS alerts.")
+                    } else {
+                        showSnackbar("🚨 SOS Alert failed: ${error.localizedMessage}")
+                    }
+                }
+            )
         }
     }
 

@@ -24,15 +24,19 @@ class MedicationRepository(private val dao: MedicationDao) {
     }
 
     suspend fun markAsTaken(id: Long) {
+        markDoseAsTaken(id, "08:00 AM", java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date()))
+    }
+
+    suspend fun markDoseAsTaken(id: Long, timeScheduled: String, dateScheduled: String) {
         val med = dao.getMedicationById(id) ?: return
-        dao.markMedicationTaken(id, true, System.currentTimeMillis())
+        dao.decrementRemainingTablets(id)
 
         val log = MedicationLog(
             medicationId = id,
             medicationName = med.name,
             dosage = med.dosage,
-            dateScheduled = "2026-08-06",
-            timeScheduled = med.timeOfConsumption,
+            dateScheduled = dateScheduled,
+            timeScheduled = timeScheduled,
             status = "TAKEN",
             timestampTaken = System.currentTimeMillis()
         )

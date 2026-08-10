@@ -1,13 +1,16 @@
 package com.example.ui.components
 
-import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -15,7 +18,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.LanguageManager
-import com.example.ui.theme.*
 
 @Composable
 fun ColorWarningView(
@@ -25,49 +27,53 @@ fun ColorWarningView(
     isElderMode: Boolean = true,
     onListenWarning: (String) -> Unit = {}
 ) {
-    val (badgeColor, containerColor, iconVector, titleText, descKey, emojiPrefix) = when (riskLevel.uppercase()) {
-        "HIGH", "DANGER", "RED" -> Tuple6(
-            HealthDanger,
-            HealthDangerContainer,
-            Icons.Filled.Cancel,
-            "🔴 Red: Dangerous Combination",
-            "warning_danger",
-            "🔴"
-        )
-        "MODERATE", "CAUTION", "YELLOW" -> Tuple6(
-            HealthWarning,
-            HealthWarningContainer,
-            Icons.Filled.Warning,
-            "🟡 Yellow: Use Carefully",
-            "warning_caution",
-            "🟡"
-        )
-        else -> Tuple6(
-            HealthSafe,
-            HealthSafeContainer,
-            Icons.Filled.CheckCircle,
-            "🟢 Green: Safe Combination",
-            "warning_safe",
-            "🟢"
-        )
+    var expanded by remember { mutableStateOf(false) }
+
+    val safeGreen = Color(0xFF34C759)
+    val warningOrange = Color(0xFFFF9500)
+    val dangerRed = Color(0xFFFF3B30)
+
+    val normalizedRisk = riskLevel.uppercase()
+    val (accentColor, iconVector, statusTitle, statusSubtitle) = when {
+        normalizedRisk.contains("HIGH") || normalizedRisk.contains("DANGER") || normalizedRisk.contains("RED") -> {
+            Tuple4(
+                dangerRed,
+                Icons.Filled.Warning,
+                LanguageManager.getText("status_title_danger", selectedLanguage),
+                LanguageManager.getText("warning_danger", selectedLanguage)
+            )
+        }
+        normalizedRisk.contains("MODERATE") || normalizedRisk.contains("CAUTION") || normalizedRisk.contains("YELLOW") -> {
+            Tuple4(
+                warningOrange,
+                Icons.Filled.PriorityHigh,
+                LanguageManager.getText("status_title_caution", selectedLanguage),
+                LanguageManager.getText("warning_caution", selectedLanguage)
+            )
+        }
+        else -> {
+            Tuple4(
+                safeGreen,
+                Icons.Filled.Check,
+                LanguageManager.getText("status_title_safe", selectedLanguage),
+                LanguageManager.getText("warning_safe", selectedLanguage)
+            )
+        }
     }
 
-    val localizedDesc = LanguageManager.getText(descKey, selectedLanguage)
-    val textToSpeak = "$titleText. $localizedDesc. ${rawSummary.take(120)}"
-
-    val fontSizeTitle = if (isElderMode) 20.sp else 16.sp
-    val fontSizeBody = if (isElderMode) 16.sp else 14.sp
+    val textToSpeak = "$statusTitle. $statusSubtitle. ${if (rawSummary.isNotBlank()) rawSummary else ""}"
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = containerColor)
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.3f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -78,17 +84,18 @@ fun ColorWarningView(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
+                    // Small circular accent badge
                     Surface(
                         shape = CircleShape,
-                        color = badgeColor,
-                        modifier = Modifier.size(if (isElderMode) 48.dp else 40.dp)
+                        color = accentColor.copy(alpha = 0.12f),
+                        modifier = Modifier.size(if (isElderMode) 40.dp else 34.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = iconVector,
                                 contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(if (isElderMode) 28.dp else 24.dp)
+                                tint = accentColor,
+                                modifier = Modifier.size(if (isElderMode) 22.dp else 18.dp)
                             )
                         }
                     }
@@ -97,54 +104,79 @@ fun ColorWarningView(
 
                     Column {
                         Text(
-                            text = titleText,
+                            text = statusTitle,
                             fontWeight = FontWeight.Bold,
-                            fontSize = fontSizeTitle,
-                            color = badgeColor
+                            fontSize = if (isElderMode) 17.sp else 15.sp,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Safety Status Indicator",
-                            fontSize = 12.sp,
+                            text = statusSubtitle,
+                            fontSize = if (isElderMode) 14.sp else 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
-                Button(
+                // Audio Read Button
+                IconButton(
                     onClick = { onListenWarning(textToSpeak) },
-                    colors = ButtonDefaults.buttonColors(containerColor = badgeColor),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                    modifier = Modifier.size(36.dp)
                 ) {
-                    Icon(Icons.Filled.VolumeUp, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = LanguageManager.getText("listen_warning", selectedLanguage),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
+                    Icon(
+                        imageVector = Icons.Filled.VolumeUp,
+                        contentDescription = "Listen status",
+                        tint = accentColor,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
 
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text(
-                        text = "$emojiPrefix $localizedDesc",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = fontSizeTitle,
-                        color = MaterialTheme.colorScheme.onSurface
+            // Learn More Section if detailed summary exists
+            if (rawSummary.isNotBlank()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { expanded = !expanded }
+                        .padding(top = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Outlined.Info,
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (expanded) "Hide Details" else "Learn More",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = accentColor
+                        )
+                    }
+                    Icon(
+                        imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(16.dp)
                     )
+                }
 
-                    if (rawSummary.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(6.dp))
+                AnimatedVisibility(visible = expanded) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp)
+                    ) {
                         Text(
                             text = rawSummary,
-                            fontSize = fontSizeBody,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            fontSize = if (isElderMode) 14.sp else 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(12.dp)
                         )
                     }
                 }
@@ -153,6 +185,6 @@ fun ColorWarningView(
     }
 }
 
-private data class Tuple6<A, B, C, D, E, F>(
-    val a: A, val b: B, val c: C, val d: D, val e: E, val f: F
+private data class Tuple4<A, B, C, D>(
+    val a: A, val b: B, val c: C, val d: D
 )

@@ -450,13 +450,20 @@ class FirebaseAuthRepository(private val context: Context) {
         return Result.success(Unit)
     }
 
-    suspend fun linkParentToPatient(parentUid: String, connectionCode: String): Result<UserProfile> {
+    // --- Connection Requests & Approval ---
+    suspend fun requestGuardianConnection(
+        guardianUid: String,
+        guardianName: String,
+        guardianEmail: String,
+        connectionCode: String
+    ): Result<PatientGuardianConnection> {
         val firestore = getFirestore()
+        val code = connectionCode.trim()
 
         if (firestore != null) {
             return suspendCancellableCoroutine { continuation ->
                 firestore.collection("users")
-                    .whereEqualTo("connectionCode", connectionCode.trim())
+                    .whereEqualTo("connectionCode", code)
                     .whereEqualTo("role", UserProfile.ROLE_PATIENT)
                     .get()
                     .addOnSuccessListener { querySnapshot ->
@@ -464,31 +471,43 @@ class FirebaseAuthRepository(private val context: Context) {
                             val patientDoc = querySnapshot.documents[0]
                             val patientId = patientDoc.id
                             val patientName = patientDoc.getString("name") ?: "Patient"
+                            val patientEmail = patientDoc.getString("email") ?: ""
 
-                            val connectionId = "${parentUid}_${patientId}"
-                            val connectionData = hashMapOf(
-                                "patientId" to patientId,
-                                "parentId" to parentUid,
-                                "connectionCode" to connectionCode,
-                                "createdAt" to System.currentTimeMillis()
+                            val connectionId = "${patientId}_${guardianUid}"
+                            val conn = PatientGuardianConnection(
+                                connectionId = connectionId,
+                                patientId = patientId,
+                                patientName = patientName,
+                                patientEmail = patientEmail,
+                                guardianId = guardianUid,
+                                guardianName = guardianName,
+                                guardianEmail = guardianEmail,
+                                status = PatientGuardianConnection.STATUS_PENDING,
+                                createdAt = System.currentTimeMillis()
                             )
 
-                            firestore.collection("connections").document(connectionId).set(connectionData)
+                            val connData = hashMapOf(
+                                "connectionId" to connectionId,
+                                "patientId" to patientId,
+                                "patientName" to patientName,
+                                "patientEmail" to patientEmail,
+                                "guardianId" to guardianUid,
+                                "guardianName" to guardianName,
+                                "guardianEmail" to guardianEmail,
+                                "status" to PatientGuardianConnection.STATUS_PENDING,
+                                "createdAt" to conn.createdAt
+                            )
+
+                            firestore.collection("connections").document(connectionId).set(connData)
                                 .addOnSuccessListener {
-                                    val currentLocal = getLocalProfile() ?: UserProfile(uid = parentUid, role = UserProfile.ROLE_PARENT)
-                                    val updated = currentLocal.copy(
-                                        connectedPatientId = patientId,
-                                        connectedPatientName = patientName,
-                                        connectedPatientCode = connectionCode
-                                    )
-                                    saveLocalProfile(updated)
-                                    if (continuation.isActive) continuation.resume(Result.success(updated))
+                                    saveLocalConnection(conn)
+                                    if (continuation.isActive) continuation.resume(Result.success(conn))
                                 }
                                 .addOnFailureListener { e ->
                                     if (continuation.isActive) continuation.resume(Result.failure(e))
                                 }
                         } else {
-                            if (continuation.isActive) continuation.resume(Result.failure(Exception("No patient found with connection code: $connectionCode")))
+                            if (continuation.isActive) continuation.resume(Result.failure(Exception("No patient found with connection code: $code")))
                         }
                     }
                     .addOnFailureListener { e ->
@@ -496,14 +515,280 @@ class FirebaseAuthRepository(private val context: Context) {
                     }
             }
         } else {
-            val currentLocal = getLocalProfile() ?: UserProfile(uid = parentUid, role = UserProfile.ROLE_PARENT)
-            val updated = currentLocal.copy(
-                connectedPatientId = "pat_$connectionCode",
-                connectedPatientName = "Patient ($connectionCode)",
-                connectedPatientCode = connectionCode
+            val localConn = PatientGuardianConnection(
+                connectionId = "pat_${code}_${guardianUid}",
+                patientId = "pat_$code",
+                patientName = "Patient ($code)",
+                patientEmail = "patient@example.com",
+                guardianId = guardianUid,
+                guardianName = guardianName,
+                guardianEmail = guardianEmail,
+                status = PatientGuardianConnection.STATUS_PENDING,
+                createdAt = System.currentTimeMillis()
             )
-            saveLocalProfile(updated)
-            return Result.success(updated)
+            saveLocalConnection(localConn)
+            return Result.success(localConn)
+        }
+    }
+
+    suspend fun fetchPendingConnectionRequests(patientUid: String): List<PatientGuardianConnection> {
+        val firestore = getFirestore()
+        if (firestore != null && patientUid.isNotBlank()) {
+            return suspendCancellableCoroutine { continuation ->
+                firestore.collection("connections")
+                    .whereEqualTo("patientId", patientUid)
+                    .whereEqualTo("status", PatientGuardianConnection.STATUS_PENDING)
+                    .get()
+                    .addOnSuccessListener { query ->
+                        val list = query.documents.mapNotNull { doc ->
+                            doc.toObject(PatientGuardianConnection::class.java)
+                        }
+                        if (continuation.isActive) continuation.resume(list)
+                    }
+                    .addOnFailureListener {
+                        if (continuation.isActive) continuation.resume(getLocalPendingConnections(patientUid))
+                    }
+            }
+        }
+        return getLocalPendingConnections(patientUid)
+    }
+
+    suspend fun respondToConnectionRequest(connectionId: String, accept: Boolean): Result<Unit> {
+        val firestore = getFirestore()
+        val newStatus = if (accept) PatientGuardianConnection.STATUS_ACCEPTED else PatientGuardianConnection.STATUS_REJECTED
+        val updates = hashMapOf<String, Any>(
+            "status" to newStatus,
+            "acceptedAt" to System.currentTimeMillis()
+        )
+
+        updateLocalConnectionStatus(connectionId, newStatus)
+
+        if (firestore != null && connectionId.isNotBlank()) {
+            return suspendCancellableCoroutine { continuation ->
+                firestore.collection("connections").document(connectionId)
+                    .update(updates)
+                    .addOnSuccessListener {
+                        if (continuation.isActive) continuation.resume(Result.success(Unit))
+                    }
+                    .addOnFailureListener { e ->
+                        if (continuation.isActive) continuation.resume(Result.failure(e))
+                    }
+            }
+        }
+        return Result.success(Unit)
+    }
+
+    suspend fun fetchAcceptedConnectionsForPatient(patientUid: String): List<PatientGuardianConnection> {
+        val firestore = getFirestore()
+        if (firestore != null && patientUid.isNotBlank()) {
+            return suspendCancellableCoroutine { continuation ->
+                firestore.collection("connections")
+                    .whereEqualTo("patientId", patientUid)
+                    .whereEqualTo("status", PatientGuardianConnection.STATUS_ACCEPTED)
+                    .get()
+                    .addOnSuccessListener { query ->
+                        val list = query.documents.mapNotNull { doc ->
+                            doc.toObject(PatientGuardianConnection::class.java)
+                        }
+                        if (continuation.isActive) continuation.resume(list)
+                    }
+                    .addOnFailureListener {
+                        if (continuation.isActive) continuation.resume(getLocalAcceptedConnectionsForPatient(patientUid))
+                    }
+            }
+        }
+        return getLocalAcceptedConnectionsForPatient(patientUid)
+    }
+
+    suspend fun fetchAcceptedPatientsForGuardian(guardianUid: String): List<PatientGuardianConnection> {
+        val firestore = getFirestore()
+        if (firestore != null && guardianUid.isNotBlank()) {
+            return suspendCancellableCoroutine { continuation ->
+                firestore.collection("connections")
+                    .whereEqualTo("guardianId", guardianUid)
+                    .whereEqualTo("status", PatientGuardianConnection.STATUS_ACCEPTED)
+                    .get()
+                    .addOnSuccessListener { query ->
+                        val list = query.documents.mapNotNull { doc ->
+                            doc.toObject(PatientGuardianConnection::class.java)
+                        }
+                        if (continuation.isActive) continuation.resume(list)
+                    }
+                    .addOnFailureListener {
+                        if (continuation.isActive) continuation.resume(getLocalAcceptedConnectionsForGuardian(guardianUid))
+                    }
+            }
+        }
+        return getLocalAcceptedConnectionsForGuardian(guardianUid)
+    }
+
+    // --- SOS Emergency Routing ---
+    suspend fun sendSOSAlert(patientUid: String, patientName: String): Result<List<String>> {
+        val acceptedConns = fetchAcceptedConnectionsForPatient(patientUid)
+        if (acceptedConns.isEmpty()) {
+            return Result.failure(Exception("NO_GUARDIAN_CONNECTED"))
+        }
+
+        val firestore = getFirestore()
+        val alertedGuardianNames = mutableListOf<String>()
+
+        for (conn in acceptedConns) {
+            val alertId = "sos_${patientUid}_${System.currentTimeMillis()}"
+            val alert = EmergencyAlert(
+                alertId = alertId,
+                patientId = patientUid,
+                patientName = patientName.ifBlank { conn.patientName },
+                guardianId = conn.guardianId,
+                type = "SOS",
+                status = EmergencyAlert.STATUS_ACTIVE,
+                createdAt = System.currentTimeMillis(),
+                message = "🚨 SOS Emergency Alert from ${patientName.ifBlank { conn.patientName }}!"
+            )
+            alertedGuardianNames.add(conn.guardianName.ifBlank { "Connected Guardian" })
+
+            if (firestore != null) {
+                val data = hashMapOf(
+                    "alertId" to alert.alertId,
+                    "patientId" to alert.patientId,
+                    "patientName" to alert.patientName,
+                    "guardianId" to alert.guardianId,
+                    "type" to alert.type,
+                    "status" to alert.status,
+                    "createdAt" to alert.createdAt,
+                    "message" to alert.message
+                )
+                firestore.collection("emergencyAlerts").document(alertId).set(data)
+            }
+            saveLocalEmergencyAlert(alert)
+        }
+
+        return Result.success(alertedGuardianNames)
+    }
+
+    suspend fun fetchActiveEmergencyAlerts(guardianUid: String): List<EmergencyAlert> {
+        val firestore = getFirestore()
+        if (firestore != null && guardianUid.isNotBlank()) {
+            return suspendCancellableCoroutine { continuation ->
+                firestore.collection("emergencyAlerts")
+                    .whereEqualTo("guardianId", guardianUid)
+                    .whereEqualTo("status", EmergencyAlert.STATUS_ACTIVE)
+                    .get()
+                    .addOnSuccessListener { query ->
+                        val list = query.documents.mapNotNull { doc ->
+                            doc.toObject(EmergencyAlert::class.java)
+                        }
+                        if (continuation.isActive) continuation.resume(list)
+                    }
+                    .addOnFailureListener {
+                        if (continuation.isActive) continuation.resume(getLocalActiveEmergencyAlerts(guardianUid))
+                    }
+            }
+        }
+        return getLocalActiveEmergencyAlerts(guardianUid)
+    }
+
+    suspend fun resolveEmergencyAlert(alertId: String): Result<Unit> {
+        val firestore = getFirestore()
+        if (firestore != null && alertId.isNotBlank()) {
+            firestore.collection("emergencyAlerts").document(alertId).update("status", EmergencyAlert.STATUS_RESOLVED)
+        }
+        resolveLocalEmergencyAlert(alertId)
+        return Result.success(Unit)
+    }
+
+    // --- Local Connection & Alert Helpers ---
+    private val connPrefs = context.getSharedPreferences("caresync_connections_prefs", Context.MODE_PRIVATE)
+
+    private fun saveLocalConnection(conn: PatientGuardianConnection) {
+        val set = connPrefs.getStringSet("all_conn_ids", mutableSetOf()) ?: mutableSetOf()
+        val newSet = set.toMutableSet()
+        newSet.add(conn.connectionId)
+
+        connPrefs.edit()
+            .putStringSet("all_conn_ids", newSet)
+            .putString("patientId_${conn.connectionId}", conn.patientId)
+            .putString("patientName_${conn.connectionId}", conn.patientName)
+            .putString("patientEmail_${conn.connectionId}", conn.patientEmail)
+            .putString("guardianId_${conn.connectionId}", conn.guardianId)
+            .putString("guardianName_${conn.connectionId}", conn.guardianName)
+            .putString("guardianEmail_${conn.connectionId}", conn.guardianEmail)
+            .putString("status_${conn.connectionId}", conn.status)
+            .putLong("createdAt_${conn.connectionId}", conn.createdAt)
+            .apply()
+    }
+
+    private fun updateLocalConnectionStatus(connectionId: String, status: String) {
+        connPrefs.edit().putString("status_$connectionId", status).apply()
+    }
+
+    private fun getLocalPendingConnections(patientUid: String): List<PatientGuardianConnection> {
+        return getAllLocalConnections().filter { (it.patientId == patientUid || patientUid.isBlank()) && it.isPending }
+    }
+
+    private fun getLocalAcceptedConnectionsForPatient(patientUid: String): List<PatientGuardianConnection> {
+        return getAllLocalConnections().filter { (it.patientId == patientUid || patientUid.isBlank()) && it.isAccepted }
+    }
+
+    private fun getLocalAcceptedConnectionsForGuardian(guardianUid: String): List<PatientGuardianConnection> {
+        return getAllLocalConnections().filter { (it.guardianId == guardianUid || guardianUid.isBlank()) && it.isAccepted }
+    }
+
+    private fun getAllLocalConnections(): List<PatientGuardianConnection> {
+        val ids = connPrefs.getStringSet("all_conn_ids", emptySet()) ?: emptySet()
+        return ids.mapNotNull { id ->
+            val pId = connPrefs.getString("patientId_$id", null) ?: return@mapNotNull null
+            PatientGuardianConnection(
+                connectionId = id,
+                patientId = pId,
+                patientName = connPrefs.getString("patientName_$id", "Patient") ?: "Patient",
+                patientEmail = connPrefs.getString("patientEmail_$id", "") ?: "",
+                guardianId = connPrefs.getString("guardianId_$id", "") ?: "",
+                guardianName = connPrefs.getString("guardianName_$id", "Guardian") ?: "Guardian",
+                guardianEmail = connPrefs.getString("guardianEmail_$id", "") ?: "",
+                status = connPrefs.getString("status_$id", PatientGuardianConnection.STATUS_PENDING) ?: PatientGuardianConnection.STATUS_PENDING,
+                createdAt = connPrefs.getLong("createdAt_$id", 0L)
+            )
+        }
+    }
+
+    private fun saveLocalEmergencyAlert(alert: EmergencyAlert) {
+        val alertsSet = connPrefs.getStringSet("all_alert_ids", mutableSetOf()) ?: mutableSetOf()
+        val newSet = alertsSet.toMutableSet()
+        newSet.add(alert.alertId)
+
+        connPrefs.edit()
+            .putStringSet("all_alert_ids", newSet)
+            .putString("patientId_alert_${alert.alertId}", alert.patientId)
+            .putString("patientName_alert_${alert.alertId}", alert.patientName)
+            .putString("guardianId_alert_${alert.alertId}", alert.guardianId)
+            .putString("type_alert_${alert.alertId}", alert.type)
+            .putString("status_alert_${alert.alertId}", alert.status)
+            .putString("message_alert_${alert.alertId}", alert.message)
+            .putLong("createdAt_alert_${alert.alertId}", alert.createdAt)
+            .apply()
+    }
+
+    private fun resolveLocalEmergencyAlert(alertId: String) {
+        connPrefs.edit().putString("status_alert_$alertId", EmergencyAlert.STATUS_RESOLVED).apply()
+    }
+
+    private fun getLocalActiveEmergencyAlerts(guardianUid: String): List<EmergencyAlert> {
+        val alertIds = connPrefs.getStringSet("all_alert_ids", emptySet()) ?: emptySet()
+        return alertIds.mapNotNull { id ->
+            val gId = connPrefs.getString("guardianId_alert_$id", null) ?: return@mapNotNull null
+            val status = connPrefs.getString("status_alert_$id", EmergencyAlert.STATUS_ACTIVE) ?: EmergencyAlert.STATUS_ACTIVE
+            if ((gId == guardianUid || guardianUid.isBlank()) && status == EmergencyAlert.STATUS_ACTIVE) {
+                EmergencyAlert(
+                    alertId = id,
+                    patientId = connPrefs.getString("patientId_alert_$id", "") ?: "",
+                    patientName = connPrefs.getString("patientName_alert_$id", "Patient") ?: "Patient",
+                    guardianId = gId,
+                    type = connPrefs.getString("type_alert_$id", "SOS") ?: "SOS",
+                    status = status,
+                    createdAt = connPrefs.getLong("createdAt_alert_$id", 0L),
+                    message = connPrefs.getString("message_alert_$id", "🚨 SOS Emergency Alert") ?: "🚨 SOS Emergency Alert"
+                )
+            } else null
         }
     }
 

@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,7 +30,8 @@ import kotlinx.coroutines.launch
 fun ChatbotScreen(
     messages: List<ChatMessage>,
     isLoading: Boolean,
-    onSendMessage: (String) -> Unit
+    onSendMessage: (String) -> Unit,
+    onNavigateToDashboard: () -> Unit = {}
 ) {
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -73,6 +75,14 @@ fun ChatbotScreen(
                             Text("CareSync AI Assistant", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                             Text("Powered by Gemini 3.5 Flash", fontSize = 11.sp, color = HealthSafe)
                         }
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateToDashboard) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back to Dashboard"
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)

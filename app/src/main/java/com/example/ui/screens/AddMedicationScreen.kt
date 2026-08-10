@@ -47,6 +47,8 @@ fun AddMedicationScreen(
     var searchAttempted by remember { mutableStateOf(false) }
     var showDropdown by remember { mutableStateOf(false) }
 
+    var isSaving by remember { mutableStateOf(false) }
+
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     val scrollState = rememberScrollState()
@@ -356,7 +358,8 @@ fun AddMedicationScreen(
 
             Button(
                 onClick = {
-                    if (name.isNotBlank()) {
+                    if (name.isNotBlank() && !isSaving) {
+                        isSaving = true
                         val count = totalTablets.toIntOrNull() ?: 30
                         val newMed = Medication(
                             name = name,
@@ -375,14 +378,19 @@ fun AddMedicationScreen(
                         onNavigateBack()
                     }
                 },
+                enabled = name.isNotBlank() && !isSaving,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Save Medication & Enable Reminders", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                if (isSaving) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Save Medication & Enable Reminders", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }

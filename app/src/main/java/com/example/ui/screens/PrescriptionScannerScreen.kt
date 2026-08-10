@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,7 +43,8 @@ fun PrescriptionScannerScreen(
     isElderMode: Boolean = true,
     onScanPreset: (String) -> Unit = {},
     onImportMedication: (String, String, String, String) -> Unit,
-    onReadAloudText: (String) -> Unit = {}
+    onReadAloudText: (String) -> Unit = {},
+    onNavigateToDashboard: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
@@ -107,6 +109,14 @@ fun PrescriptionScannerScreen(
         topBar = {
             TopAppBar(
                 title = { Text(LanguageManager.getText("scan_medicine", selectedLanguage), fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateToDashboard) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back to Dashboard"
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },

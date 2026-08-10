@@ -25,6 +25,9 @@ interface MedicationDao {
     @Query("UPDATE medications SET isTakenToday = :taken, remainingTablets = CASE WHEN :taken = 1 AND remainingTablets > 0 THEN remainingTablets - 1 ELSE remainingTablets END, lastTakenTimestamp = :timestamp WHERE id = :id")
     suspend fun markMedicationTaken(id: Long, taken: Boolean, timestamp: Long)
 
+    @Query("UPDATE medications SET remainingTablets = CASE WHEN remainingTablets > 0 THEN remainingTablets - 1 ELSE 0 END WHERE id = :id")
+    suspend fun decrementRemainingTablets(id: Long)
+
     @Query("UPDATE medications SET remainingTablets = remainingTablets + :addedCount WHERE id = :id")
     suspend fun refillStock(id: Long, addedCount: Int)
 

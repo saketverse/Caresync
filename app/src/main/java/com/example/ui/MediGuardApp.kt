@@ -39,7 +39,6 @@ fun MediGuardApp(
 
     val userName by viewModel.userName.collectAsStateWithLifecycle()
     val userEmail by viewModel.userEmail.collectAsStateWithLifecycle()
-    val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
     val isVoiceEnabled by viewModel.isVoiceEnabled.collectAsStateWithLifecycle()
 
     val selectedLanguage by viewModel.selectedLanguage.collectAsStateWithLifecycle()
@@ -51,8 +50,16 @@ fun MediGuardApp(
     val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
 
     val medications by viewModel.activeMedications.collectAsStateWithLifecycle()
+    val medicationLogs by viewModel.medicationLogs.collectAsStateWithLifecycle()
+    val todayDoseItems by viewModel.todayDoseItems.collectAsStateWithLifecycle()
     val savedInteractions by viewModel.drugInteractions.collectAsStateWithLifecycle()
     val familyMembers by viewModel.familyMembers.collectAsStateWithLifecycle()
+
+    val pendingConnectionRequests by viewModel.pendingConnectionRequests.collectAsStateWithLifecycle()
+    val acceptedGuardians by viewModel.acceptedGuardians.collectAsStateWithLifecycle()
+    val acceptedPatients by viewModel.acceptedPatients.collectAsStateWithLifecycle()
+    val activeEmergencyAlerts by viewModel.activeEmergencyAlerts.collectAsStateWithLifecycle()
+    val showNoGuardianDialog by viewModel.showNoGuardianDialog.collectAsStateWithLifecycle()
 
     val interactionResult by viewModel.interactionResult.collectAsStateWithLifecycle()
     val isCheckingInteractions by viewModel.isCheckingInteractions.collectAsStateWithLifecycle()
@@ -65,6 +72,12 @@ fun MediGuardApp(
 
     val snackbarMessage by viewModel.snackbarMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(currentRoute) {
+        if (currentRoute == Screen.FamilyMonitoring.route || currentRoute == Screen.Dashboard.route) {
+            viewModel.refreshConnectionsAndAlerts()
+        }
+    }
 
     LaunchedEffect(snackbarMessage) {
         snackbarMessage?.let {
@@ -130,7 +143,63 @@ fun MediGuardApp(
         )
     }
 
-    MediGuardTheme(darkTheme = isDarkMode) {
+    val navigateToDashboard: () -> Unit = {
+        navController.navigate(Screen.Dashboard.route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                inclusive = false
+                saveState = false
+            }
+            launchSingleTop = true
+            restoreState = false
+        }
+    }
+
+    val navigateToTab: (String) -> Unit = { route ->
+        if (route == Screen.Dashboard.route) {
+            navigateToDashboard()
+        } else {
+            navController.navigate(route) {
+                popUpTo(navController.graph.findStartDestination().id) {
+                    saveState = true
+                }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+
+    if (showNoGuardianDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissNoGuardianDialog() },
+            icon = { Icon(Icons.Filled.NotificationsActive, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(32.dp)) },
+            title = { Text("No Family Guardian Connected", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "You do not have any connected family guardian to receive SOS alerts. Go to Family & Guardian Connections to share your code with a caregiver.",
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.dismissNoGuardianDialog()
+                        navigateToTab(Screen.FamilyMonitoring.route)
+                    }
+                ) {
+                    Text("Go to Family Care", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.dismissNoGuardianDialog() }
+                ) {
+                    Text("Dismiss")
+                }
+            }
+        )
+    }
+
+    MediGuardTheme {
         Scaffold(
             bottomBar = {
                 if (isLoggedIn && currentRoute != Screen.Splash.route && currentRoute != Screen.Auth.route && currentRoute != Screen.ConnectPatient.route) {
@@ -142,15 +211,7 @@ fun MediGuardApp(
                             val selected = currentRoute == screen.route
                             NavigationBarItem(
                                 selected = selected,
-                                onClick = {
-                                    navController.navigate(screen.route) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            saveState = true
-                                        }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                },
+                                onClick = { navigateToTab(screen.route) },
                                 icon = {
                                     Icon(
                                         imageVector = if (selected) screen.selectedIcon else screen.unselectedIcon,
@@ -218,9 +279,7 @@ fun MediGuardApp(
                     SplashScreen(
                         onNavigateNext = {
                             if (isLoggedIn) {
-                                navController.navigate(Screen.Dashboard.route) {
-                                    popUpTo(Screen.Splash.route) { inclusive = true }
-                                }
+                                navigateToDashboard()
                             } else {
                                 navController.navigate(Screen.Auth.route) {
                                     popUpTo(Screen.Splash.route) { inclusive = true }
@@ -240,9 +299,7 @@ fun MediGuardApp(
                                         popUpTo(Screen.Auth.route) { inclusive = true }
                                     }
                                 } else {
-                                    navController.navigate(Screen.Dashboard.route) {
-                                        popUpTo(Screen.Auth.route) { inclusive = true }
-                                    }
+                                    navigateToDashboard()
                                 }
                             }
                         },
@@ -253,9 +310,7 @@ fun MediGuardApp(
                                         popUpTo(Screen.Auth.route) { inclusive = true }
                                     }
                                 } else {
-                                    navController.navigate(Screen.Dashboard.route) {
-                                        popUpTo(Screen.Auth.route) { inclusive = true }
-                                    }
+                                    navigateToDashboard()
                                 }
                             }
                         },
@@ -272,9 +327,7 @@ fun MediGuardApp(
                                         popUpTo(Screen.Auth.route) { inclusive = true }
                                     }
                                 } else {
-                                    navController.navigate(Screen.Dashboard.route) {
-                                        popUpTo(Screen.Auth.route) { inclusive = true }
-                                    }
+                                    navigateToDashboard()
                                 }
                             }
                         }
@@ -287,15 +340,11 @@ fun MediGuardApp(
                         isLoading = isAuthLoading,
                         onConnectCode = { code ->
                             viewModel.linkParentToPatient(code) {
-                                navController.navigate(Screen.Dashboard.route) {
-                                    popUpTo(Screen.ConnectPatient.route) { inclusive = true }
-                                }
+                                navigateToDashboard()
                             }
                         },
                         onSkip = {
-                            navController.navigate(Screen.Dashboard.route) {
-                                popUpTo(Screen.ConnectPatient.route) { inclusive = true }
-                            }
+                            navigateToDashboard()
                         }
                     )
                 }
@@ -304,18 +353,21 @@ fun MediGuardApp(
                     DashboardScreen(
                         userName = userName,
                         medications = medications,
+                        medicationLogs = medicationLogs,
+                        todayDoseItems = todayDoseItems,
                         interactionResult = interactionResult,
                         isCheckingInteractions = isCheckingInteractions,
                         selectedLanguage = selectedLanguage,
                         isElderMode = isElderMode,
                         onMarkTaken = { id -> viewModel.markTaken(id) },
+                        onMarkDoseTaken = { medId, timeSlot -> viewModel.markDoseTaken(medId, timeSlot) },
                         onSpeakReminder = { med -> viewModel.speakMedicineReminderForMed(med) },
                         onListenWarning = { text -> viewModel.speakText(text) },
-                        onNavigateToAdd = { navController.navigate(Screen.AddMedication.route) },
-                        onNavigateToInteractions = { navController.navigate(Screen.DrugInteractions.route) },
-                        onNavigateToChatbot = { navController.navigate(Screen.Chatbot.route) },
-                        onNavigateToScanner = { navController.navigate(Screen.PrescriptionScanner.route) },
-                        onNavigateToFamily = { navController.navigate(Screen.FamilyMonitoring.route) },
+                        onNavigateToAdd = { navigateToTab(Screen.AddMedication.route) },
+                        onNavigateToInteractions = { navigateToTab(Screen.DrugInteractions.route) },
+                        onNavigateToChatbot = { navigateToTab(Screen.Chatbot.route) },
+                        onNavigateToScanner = { navigateToTab(Screen.PrescriptionScanner.route) },
+                        onNavigateToFamily = { navigateToTab(Screen.FamilyMonitoring.route) },
                         onNavigateToProfile = { navController.navigate(Screen.Profile.route) },
                         onTriggerEmergency = { viewModel.triggerEmergencySOS(healthProfile.emergencyContactName ?: "Emergency Contact", healthProfile.emergencyContactPhone ?: "112") },
                         onLogout = {
@@ -343,7 +395,8 @@ fun MediGuardApp(
                         onRefillStock = { id -> viewModel.refillStock(id) },
                         onSpeakReminder = { med -> viewModel.speakMedicineReminderForMed(med) },
                         onTriggerEscalation = { med, stage -> viewModel.triggerMissedReminderEscalation(med, stage) },
-                        onShowTestNotification = { msg -> viewModel.showSnackbar(msg) }
+                        onShowTestNotification = { msg -> viewModel.showSnackbar(msg) },
+                        onNavigateToDashboard = navigateToDashboard
                     )
                 }
 
@@ -356,7 +409,8 @@ fun MediGuardApp(
                         selectedLanguage = selectedLanguage,
                         isElderMode = isElderMode,
                         onRunAnalysis = { viewModel.runDrugInteractionCheck() },
-                        onListenWarning = { text -> viewModel.speakText(text) }
+                        onListenWarning = { text -> viewModel.speakText(text) },
+                        onNavigateToDashboard = navigateToDashboard
                     )
                 }
 
@@ -364,7 +418,8 @@ fun MediGuardApp(
                     ChatbotScreen(
                         messages = chatMessages,
                         isLoading = isChatLoading,
-                        onSendMessage = { text -> viewModel.sendChatMessage(text) }
+                        onSendMessage = { text -> viewModel.sendChatMessage(text) },
+                        onNavigateToDashboard = navigateToDashboard
                     )
                 }
 
@@ -378,18 +433,25 @@ fun MediGuardApp(
                         onImportMedication = { name, dosage, time, food ->
                             viewModel.autoAddScannedMedicationToSchedule(name, dosage, time, food)
                         },
-                        onReadAloudText = { text -> viewModel.speakText(text) }
+                        onReadAloudText = { text -> viewModel.speakText(text) },
+                        onNavigateToDashboard = navigateToDashboard
                     )
                 }
 
                 composable(Screen.FamilyMonitoring.route) {
                     FamilyMonitoringScreen(
+                        userRole = userProfile.role,
+                        patientConnectionCode = userProfile.connectionCode.ifBlank { userProfile.uid.take(6).uppercase() },
+                        pendingRequests = pendingConnectionRequests,
+                        acceptedGuardians = acceptedGuardians,
+                        acceptedPatients = acceptedPatients,
+                        activeEmergencyAlerts = activeEmergencyAlerts,
                         familyMembers = familyMembers,
-                        onAddFamilyMember = { name, rel, phone, email ->
-                            viewModel.addFamilyMember(name, rel, phone, email)
-                        },
-                        onDeleteFamilyMember = { member -> viewModel.deleteFamilyMember(member) },
-                        onTriggerSOS = { name, phone -> viewModel.triggerEmergencySOS(name, phone) }
+                        onSendConnectionRequest = { code -> viewModel.sendConnectionRequest(code) },
+                        onRespondToRequest = { connId, accept -> viewModel.respondToConnectionRequest(connId, accept) },
+                        onResolveEmergencyAlert = { alertId -> viewModel.resolveEmergencyAlert(alertId) },
+                        onTriggerSOS = { name, phone -> viewModel.triggerEmergencySOS(name, phone) },
+                        onNavigateToDashboard = navigateToDashboard
                     )
                 }
 
@@ -397,7 +459,6 @@ fun MediGuardApp(
                     ProfileScreen(
                         userProfile = userProfile,
                         healthProfile = healthProfile,
-                        isDarkMode = isDarkMode,
                         isVoiceEnabled = isVoiceEnabled,
                         selectedLanguage = selectedLanguage,
                         isElderMode = isElderMode,
@@ -405,7 +466,6 @@ fun MediGuardApp(
                         voiceVolume = voiceVolume,
                         escalationMinutes = escalationMinutes,
                         isBatteryOptimizationIgnored = isBatteryOptimizationIgnored,
-                        onToggleDarkMode = { viewModel.toggleDarkMode() },
                         onToggleVoice = { viewModel.toggleVoice() },
                         onSelectLanguage = { code -> viewModel.setLanguage(code) },
                         onToggleElderMode = { viewModel.toggleElderMode() },
@@ -413,12 +473,13 @@ fun MediGuardApp(
                         onSetVoiceVolume = { vol -> viewModel.setVoiceVolume(vol) },
                         onSetEscalationMinutes = { mins -> viewModel.setEscalationMinutes(mins) },
                         onTestVoiceReminder = {
-                            viewModel.speakText("This is a test voice reminder in ${LanguageManager.getLanguageNativeName(selectedLanguage)}.")
+                            viewModel.testVoice()
                         },
                         onRequestDisableBatteryOptimization = { viewModel.requestDisableBatteryOptimization() },
                         onStartForegroundService = { viewModel.startForegroundReminderService() },
                         onUpdateHealthProfile = { updated -> viewModel.updateHealthProfile(updated) },
                         onNavigateToConnectPatient = { navController.navigate(Screen.ConnectPatient.route) },
+                        onNavigateToDashboard = navigateToDashboard,
                         onLogout = {
                             viewModel.logout()
                             navController.navigate(Screen.Auth.route) {

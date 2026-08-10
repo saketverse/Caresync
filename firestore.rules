@@ -92,5 +92,34 @@ service cloud.firestore {
         resource.data.patientId == request.auth.uid
       );
     }
+
+    // Patient Guardian Connections Collection
+    match /patient_guardian_connections/{connectionId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.guardianId == request.auth.uid ||
+        resource.data.patientId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.guardianId == request.auth.uid ||
+        request.resource.data.patientId == request.auth.uid
+      );
+      allow update, delete: if isAuthenticated() && (
+        resource.data.guardianId == request.auth.uid ||
+        resource.data.patientId == request.auth.uid
+      );
+    }
+
+    // Emergency Alerts Collection
+    match /emergency_alerts/{alertId} {
+      allow read, list: if isAuthenticated() && (
+        resource.data.patientId == request.auth.uid ||
+        resource.data.guardianId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && request.resource.data.patientId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (
+        resource.data.patientId == request.auth.uid ||
+        resource.data.guardianId == request.auth.uid
+      );
+    }
   }
 }

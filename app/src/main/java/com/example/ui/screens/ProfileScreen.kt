@@ -6,11 +6,14 @@ import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,7 +36,6 @@ import com.example.ui.theme.*
 fun ProfileScreen(
     userProfile: UserProfile,
     healthProfile: HealthProfile = HealthProfile(),
-    isDarkMode: Boolean,
     isVoiceEnabled: Boolean,
     selectedLanguage: String = LanguageManager.LANG_ENGLISH,
     isElderMode: Boolean = true,
@@ -41,7 +43,6 @@ fun ProfileScreen(
     voiceVolume: Float = 1.0f,
     escalationMinutes: Int = 30,
     isBatteryOptimizationIgnored: Boolean = true,
-    onToggleDarkMode: () -> Unit,
     onToggleVoice: () -> Unit,
     onSelectLanguage: (String) -> Unit = {},
     onToggleElderMode: () -> Unit = {},
@@ -53,6 +54,7 @@ fun ProfileScreen(
     onStartForegroundService: () -> Unit = {},
     onUpdateHealthProfile: (HealthProfile) -> Unit = {},
     onNavigateToConnectPatient: () -> Unit,
+    onNavigateToDashboard: () -> Unit = {},
     onLogout: () -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -202,6 +204,14 @@ fun ProfileScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Health Profile & Settings", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateToDashboard) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back to Dashboard"
+                        )
+                    }
+                },
                 actions = {
                     Button(
                         onClick = { showLogoutDialog = true },
@@ -405,38 +415,26 @@ fun ProfileScreen(
 
                     HorizontalDivider()
 
-                    // Language Selector (English & हिन्दी)
-                    Text("Select App Language / भाषा चुनें:", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MedicalPrimary)
+                    // Language Selector (All 7 Supported Indian Languages)
+                    Text("Select App & Voice Language / भाषा चुनें:", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MedicalPrimary)
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(vertical = 4.dp)
                     ) {
-                        FilterChip(
-                            selected = (selectedLanguage == LanguageManager.LANG_ENGLISH),
-                            onClick = { onSelectLanguage(LanguageManager.LANG_ENGLISH) },
-                            label = {
-                                Text(
-                                    text = "English",
-                                    fontWeight = if (selectedLanguage == LanguageManager.LANG_ENGLISH) FontWeight.Bold else FontWeight.Normal,
-                                    fontSize = 14.sp
-                                )
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-
-                        FilterChip(
-                            selected = (selectedLanguage == LanguageManager.LANG_HINDI),
-                            onClick = { onSelectLanguage(LanguageManager.LANG_HINDI) },
-                            label = {
-                                Text(
-                                    text = "हिन्दी",
-                                    fontWeight = if (selectedLanguage == LanguageManager.LANG_HINDI) FontWeight.Bold else FontWeight.Normal,
-                                    fontSize = 14.sp
-                                )
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
+                        items(LanguageManager.supportedLanguages) { lang ->
+                            FilterChip(
+                                selected = (selectedLanguage == lang.code),
+                                onClick = { onSelectLanguage(lang.code) },
+                                label = {
+                                    Text(
+                                        text = "${lang.nativeName} (${lang.displayName})",
+                                        fontWeight = if (selectedLanguage == lang.code) FontWeight.Bold else FontWeight.Normal,
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -466,6 +464,45 @@ fun ProfileScreen(
 
                     if (isVoiceEnabled) {
                         HorizontalDivider()
+
+                        // Voice Locale Status Indicator
+                        Surface(
+                            color = MedicalPrimaryContainer,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "Active Voice Engine",
+                                        fontSize = 12.sp,
+                                        color = MedicalSecondary
+                                    )
+                                    Text(
+                                        text = "${LanguageManager.getLanguageNativeName(selectedLanguage)} (${LanguageManager.getLanguageLocaleCode(selectedLanguage)})",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = MedicalPrimary
+                                    )
+                                }
+                                Surface(
+                                    color = Color(0xFF34C759).copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = "TTS Ready",
+                                        color = Color(0xFF34C759),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
 
                         Text("Voice Assistant Settings:", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
 
@@ -506,13 +543,13 @@ fun ProfileScreen(
 
                         Button(
                             onClick = onTestVoiceReminder,
-                            colors = ButtonDefaults.buttonColors(containerColor = MedicalPrimaryContainer, contentColor = MedicalPrimary),
+                            colors = ButtonDefaults.buttonColors(containerColor = MedicalPrimary, contentColor = Color.White),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(Icons.Filled.VolumeUp, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Test Voice Reminder Speech 🔊", fontWeight = FontWeight.Bold)
+                            Text("Test Voice (${LanguageManager.getLanguageNativeName(selectedLanguage)}) 🔊", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -628,28 +665,6 @@ fun ProfileScreen(
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Restart Safeguard", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
-                    }
-                }
-            }
-
-            // App Dark Theme Preference
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.DarkMode, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("Dark Theme Canvas", fontWeight = FontWeight.SemiBold)
-                        }
-                        Switch(checked = isDarkMode, onCheckedChange = { onToggleDarkMode() })
                     }
                 }
             }

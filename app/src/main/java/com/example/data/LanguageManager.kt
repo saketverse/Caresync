@@ -4,16 +4,39 @@ object LanguageManager {
 
     const val LANG_ENGLISH = "EN"
     const val LANG_HINDI = "HI"
+    const val LANG_BENGALI = "BN"
+    const val LANG_TAMIL = "TA"
+    const val LANG_TELUGU = "TE"
+    const val LANG_MARATHI = "MR"
+    const val LANG_PUNJABI = "PA"
 
-    data class LanguageItem(val code: String, val displayName: String, val nativeName: String, val localeCode: String)
+    data class LanguageItem(
+        val code: String,
+        val displayName: String,
+        val nativeName: String,
+        val localeCode: String
+    )
 
     val supportedLanguages = listOf(
         LanguageItem(LANG_ENGLISH, "English", "English", "en_IN"),
-        LanguageItem(LANG_HINDI, "Hindi", "हिन्दी", "hi_IN")
+        LanguageItem(LANG_HINDI, "Hindi", "हिन्दी", "hi_IN"),
+        LanguageItem(LANG_BENGALI, "Bengali", "বাংলা", "bn_IN"),
+        LanguageItem(LANG_TAMIL, "Tamil", "தமிழ்", "ta_IN"),
+        LanguageItem(LANG_TELUGU, "Telugu", "తెలుగు", "te_IN"),
+        LanguageItem(LANG_MARATHI, "Marathi", "मराठी", "mr_IN"),
+        LanguageItem(LANG_PUNJABI, "Punjabi", "ਪੰਜਾਬੀ", "pa_IN")
     )
 
     fun getLanguageNativeName(code: String): String {
         return supportedLanguages.find { it.code == code }?.nativeName ?: "English"
+    }
+
+    fun getLanguageDisplayName(code: String): String {
+        return supportedLanguages.find { it.code == code }?.displayName ?: "English"
+    }
+
+    fun getLanguageLocaleCode(code: String): String {
+        return supportedLanguages.find { it.code == code }?.localeCode ?: "en_IN"
     }
 
     // Key-based translation dictionary
@@ -32,12 +55,16 @@ object LanguageManager {
             "night" to "Night 🌙",
             "scan_medicine" to "Scan Medicine",
             "read_aloud" to "Read Aloud 🔊",
-            "warning_safe" to "No serious interaction detected.",
-            "warning_caution" to "Consult your doctor before taking these medicines together.",
-            "warning_danger" to "These medicines should not be taken together.",
+            "status_title_safe" to "No interaction detected",
+            "status_title_caution" to "Interaction caution",
+            "status_title_danger" to "Interaction warning",
+            "warning_safe" to "No known interaction found",
+            "warning_caution" to "These medicines may interact. Consult a healthcare professional.",
+            "warning_danger" to "These medicines may have a serious interaction. Do not make medication decisions based solely on this app; consult a healthcare professional.",
             "elder_mode" to "Elder Mode",
             "voice_reminders" to "Voice Reminders",
-            "listen_warning" to "Listen to Warning 🔊",
+            "listen_warning" to "Listen 🔊",
+            "test_voice" to "Test Voice 🔊",
             "missed_alert_caregiver" to "missed their medicine reminder."
         ),
         LANG_HINDI to mapOf(
@@ -54,13 +81,43 @@ object LanguageManager {
             "night" to "रात 🌙",
             "scan_medicine" to "दवा स्कैन करें",
             "read_aloud" to "बोलकर सुनें 🔊",
-            "warning_safe" to "कोई गंभीर दुष्परिणाम नहीं मिला।",
-            "warning_caution" to "इन दवाओं को साथ लेने से पहले डॉक्टर से सलाह लें।",
-            "warning_danger" to "ये दवाएं एक साथ नहीं ली जानी चाहिए।",
-            "elder_mode" to "वरिष्ठ नागरिक मोड (एल्डर मोड)",
-            "voice_reminders" to "आवाज में याद दिलाएं (वॉइस रिमाइंडर)",
-            "listen_warning" to "चेतावनी सुनें 🔊",
+            "status_title_safe" to "कोई प्रतिकूल प्रभाव नहीं",
+            "status_title_caution" to "सावधानी बरतें",
+            "status_title_danger" to "गंभीर चेतावनी",
+            "warning_safe" to "दवाओं में कोई प्रतिकूल प्रभाव नहीं मिला।",
+            "warning_caution" to "ये दवाएं परस्पर क्रिया कर सकती हैं। डॉक्टर से सलाह लें।",
+            "warning_danger" to "इन दवाओं का गंभीर दुष्प्रभाव हो सकता है। डॉक्टर से संपर्क करें।",
+            "elder_mode" to "वरिष्ठ नागरिक मोड",
+            "voice_reminders" to "आवाज में रिमाइंडर (वॉइस रिमाइंडर)",
+            "listen_warning" to "सुनें 🔊",
+            "test_voice" to "आवाज़ जांचें 🔊",
             "missed_alert_caregiver" to "ने अपनी दवा का रिमाइंडर मिस कर दिया है।"
+        ),
+        LANG_BENGALI to mapOf(
+            "app_title" to "কেয়ারসিঙ্ক হেলথ",
+            "take_medicine_title" to "ওষুধ নেওয়ার সময় হয়েছে",
+            "medicine_reminder_prompt" to "ওষুধ নেওয়ার সময় হয়েছে।",
+            "take_now" to "এখনই নিন",
+            "taken" to "নেওয়া হয়েছে",
+            "missed" to "বাদ পড়েছে",
+            "pill_organizer" to "ওষুধ আয়োজক",
+            "morning" to "সকাল 🌅",
+            "afternoon" to "দুপুর ☀️",
+            "evening" to "সন্ধ্যা 🌆",
+            "night" to "রাত 🌙",
+            "scan_medicine" to "ওষুধ স্ক্যান করুন",
+            "read_aloud" to "শুনে নিন 🔊",
+            "status_title_safe" to "কোনো ঝুঁকি পাওয়া যায়নি",
+            "status_title_caution" to "সতর্কতা প্রয়োজন",
+            "status_title_danger" to "গুরুতর সতর্কতা",
+            "warning_safe" to "কোনো জানা ক্ষতিকর প্রতিক্রিয়া পাওয়া যায়নি।",
+            "warning_caution" to "এই ওষুধগুলি পরস্পর প্রতিক্রিয়া করতে পারে। ডাক্তারের পরামর্শ নিন।",
+            "warning_danger" to "এই ওষুধগুলির মারাত্মক প্রতিক্রিয়া হতে পারে। অবিলম্বে ডাক্তারের সাথে কথা বলুন।",
+            "elder_mode" to "বয়স্কদের জন্য মোড",
+            "voice_reminders" to "ভয়েস রিমাইন্ডার",
+            "listen_warning" to "শুনুন 🔊",
+            "test_voice" to "ভয়েস পরীক্ষা 🔊",
+            "missed_alert_caregiver" to "ওষুধ খেতে ভুলে গেছেন।"
         )
     )
 
@@ -69,16 +126,33 @@ object LanguageManager {
         return langMap[key] ?: translations[LANG_ENGLISH]!![key] ?: key
     }
 
+    fun getTestVoiceText(langCode: String): String {
+        return when (langCode) {
+            LANG_HINDI -> "यह CareSync की हिंदी आवाज़ की जाँच है।"
+            LANG_BENGALI -> "এটি CareSync-এর বাংলা গলার স্বর পরীক্ষা।"
+            LANG_TAMIL -> "இது CareSync தமிழ் குரல் சோதனை."
+            LANG_TELUGU -> "ఇది CareSync తెలుగు వాయిస్ పరీక్ష."
+            LANG_MARATHI -> "ही CareSync च्या मराठी आवाजाची चाचणी आहे।"
+            LANG_PUNJABI -> "ਇਹ CareSync ਦੀ ਪੰਜਾਬੀ ਆਵਾਜ਼ ਦੀ ਜਾਂਚ ਹੈ।"
+            else -> "This is a test of CareSync's English voice."
+        }
+    }
+
     fun buildLocalizedVoiceReminder(
         userName: String,
         medName: String,
         dosage: String,
         langCode: String
     ): String {
-        val name = userName.ifBlank { "User" }
+        val namePrefix = if (userName.isNotBlank()) "$userName, " else ""
         return when (langCode) {
-            LANG_HINDI -> "$name, $medName $dosage लेने का समय हो गया है।"
-            else -> "$name, it's time to take $medName $dosage."
+            LANG_HINDI -> "${namePrefix}अब आपकी $medName $dosage की दवा लेने का समय हो गया है।"
+            LANG_BENGALI -> "${namePrefix}এখন আপনার $medName $dosage ওষুধ নেওয়ার সময় হয়েছে।"
+            LANG_TAMIL -> "${namePrefix}உங்கள் $medName $dosage மருந்தை எடுத்துக்கொள்ள வேண்டிய நேரம் இது."
+            LANG_TELUGU -> "${namePrefix}మీ $medName $dosage మందులు తీసుకోవడానికి సమయం అయింది."
+            LANG_MARATHI -> "${namePrefix}आता तुमची $medName $dosage औषध घेण्याची वेळ झाली आहे।"
+            LANG_PUNJABI -> "${namePrefix}ਹੁਣ ਤੁਹਾਡੀ $medName $dosage ਦਵਾਈ ਲੈਣ ਦਾ ਸਮਾਂ ਹੋ ਗਿਆ ਹੈ।"
+            else -> "${namePrefix}it's time to take your $medName $dosage."
         }
     }
 
@@ -91,6 +165,11 @@ object LanguageManager {
         val name = patientName.ifBlank { "Patient" }
         return when (langCode) {
             LANG_HINDI -> "$name ने $time की दवा ($medName) नहीं ली।"
+            LANG_BENGALI -> "$name $time-এর ওষুধ ($medName) নেননি।"
+            LANG_TAMIL -> "$name $time மருந்தினை ($medName) எடுக்கவில்லை."
+            LANG_TELUGU -> "$name $time మందు ($medName) తీసుకోలేదు."
+            LANG_MARATHI -> "$name यांनी $time ची औषध ($medName) घेतली नाही."
+            LANG_PUNJABI -> "$name ਨੇ $time ਦੀ ਦਵਾਈ ($medName) ਨਹੀਂ ਲਈ।"
             else -> "Caregiver Alert: $name missed their $time medicine ($medName)."
         }
     }
