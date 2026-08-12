@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddMedicationScreen(
-    onSaveMedication: (Medication) -> Unit,
+    onSaveMedication: (Medication, () -> Unit) -> Unit,
     onNavigateBack: () -> Unit
 ) {
     var name by remember { mutableStateOf("") }
@@ -374,8 +374,10 @@ fun AddMedicationScreen(
                             category = category,
                             prescribedBy = if (prescribedBy.isBlank() && searchedInfo != null) searchedInfo!!.manufacturer else prescribedBy
                         )
-                        onSaveMedication(newMed)
-                        onNavigateBack()
+                        onSaveMedication(newMed) {
+                            isSaving = false
+                            onNavigateBack()
+                        }
                     }
                 },
                 enabled = name.isNotBlank() && !isSaving,
@@ -385,7 +387,18 @@ fun AddMedicationScreen(
                 shape = RoundedCornerShape(16.dp)
             ) {
                 if (isSaving) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text("Saving Medication...", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
                 } else {
                     Icon(Icons.Filled.Add, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))

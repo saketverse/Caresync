@@ -2,6 +2,7 @@ package com.example.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.util.Log
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -191,6 +192,8 @@ class MediGuardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _showNoGuardianDialog = MutableStateFlow(false)
     val showNoGuardianDialog: StateFlow<Boolean> = _showNoGuardianDialog.asStateFlow()
 
+    private val pendingSubmissions = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
     fun dismissNoGuardianDialog() {
         _showNoGuardianDialog.value = false
     }
@@ -249,6 +252,20 @@ class MediGuardViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
+
+    // --- Medical Report Scanner State ---
+    private val _medicalReportResult = MutableStateFlow<com.example.data.MedicalReportAnalysisResult?>(null)
+    val medicalReportResult: StateFlow<com.example.data.MedicalReportAnalysisResult?> = _medicalReportResult.asStateFlow()
+
+    private val _isAnalyzingReport = MutableStateFlow(false)
+    val isAnalyzingReport: StateFlow<Boolean> = _isAnalyzingReport.asStateFlow()
+
+    private val _activeScannerTab = MutableStateFlow(0) // 0: Medical Report, 1: Medicine Package
+    val activeScannerTab: StateFlow<Int> = _activeScannerTab.asStateFlow()
+
+    fun setActiveScannerTab(tabIndex: Int) {
+        _activeScannerTab.value = tabIndex
+    }
 
     // --- Toast / Notification Alert State ---
     private val _snackbarMessage = MutableStateFlow<String?>(null)
@@ -577,23 +594,50 @@ class MediGuardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun addMedication(medication: Medication) {
+    fun addMedication(medication: Medication, onComplete: () -> Unit = {}) {
         if (_userProfile.value.isParent) {
             showSnackbar("⚠️ Parent / Caregiver account has read-only access.")
+            onComplete()
             return
         }
+
+        val uid = _userProfile.value.uid
+        val submissionKey = "$uid:${medication.name.trim().lowercase()}"
+
+        if (!pendingSubmissions.add(submissionKey)) {
+            Log.w("MediGuardViewModel", "Pending submission detected for key: $submissionKey. Ignoring duplicate write request.")
+            showSnackbar("A submission for ${medication.name} is already in progress...")
+            onComplete()
+            return
+        }
+
+        Log.d("MediGuardViewModel", "Tracking new pending medication submission for key: $submissionKey")
+
         viewModelScope.launch {
-            val existing = activeMedications.value.find { 
-                it.name.trim().equals(medication.name.trim(), ignoreCase = true) && 
-                it.timeOfConsumption.trim().equals(medication.timeOfConsumption.trim(), ignoreCase = true) 
+            try {
+                val existing = activeMedications.value.find { 
+                    it.name.trim().equals(medication.name.trim(), ignoreCase = true) && 
+                    it.timeOfConsumption.trim().equals(medication.timeOfConsumption.trim(), ignoreCase = true) 
+                }
+                if (existing != null) {
+                    showSnackbar("${medication.name} is already in your active schedule.")
+                    return@launch
+                }
+                // 1. Write to Firestore exactly once per submission with unique auto-generated ID
+                authRepo.saveMedicationToFirestore(uid, medication)
+
+                // 2. Local Room database insertion
+                repository.addMedication(medication)
+                showSnackbar("Added ${medication.name} to medication schedule!")
+                runDrugInteractionCheck()
+            } catch (e: Exception) {
+                Log.e("MediGuardViewModel", "Error adding medication", e)
+                showSnackbar("Failed to save medication: ${e.localizedMessage}")
+            } finally {
+                pendingSubmissions.remove(submissionKey)
+                Log.d("MediGuardViewModel", "Cleared pending submission tracker for key: $submissionKey")
+                onComplete()
             }
-            if (existing != null) {
-                showSnackbar("${medication.name} is already in your active schedule.")
-                return@launch
-            }
-            repository.addMedication(medication)
-            showSnackbar("Added ${medication.name} to medication schedule!")
-            runDrugInteractionCheck()
         }
     }
 
@@ -708,6 +752,95 @@ class MediGuardViewModel(application: Application) : AndroidViewModel(applicatio
 
             _scannedText.value = result
             _isScanning.value = false
+        }
+    }
+
+    fun analyzeMedicalReport(imageBase64: String) {
+        viewModelScope.launch {
+            _isAnalyzingReport.value = true
+            try {
+                val result = repository.analyzeMedicalReportImage(imageBase64, activeMedications.value)
+                val updatedMedicines = com.example.util.MedicalReportExtractor.compareCandidatesWithExistingRecords(
+                    result.medicines,
+                    activeMedications.value
+                )
+                _medicalReportResult.value = result.copy(medicines = updatedMedicines)
+            } catch (e: Exception) {
+                Log.e("MediGuardViewModel", "Error analyzing report image", e)
+                showSnackbar("Report scan error: ${e.localizedMessage}")
+            } finally {
+                _isAnalyzingReport.value = false
+            }
+        }
+    }
+
+    fun loadSampleReportPreset(presetResult: com.example.data.MedicalReportAnalysisResult) {
+        val updatedCandidates = com.example.util.MedicalReportExtractor.compareCandidatesWithExistingRecords(
+            presetResult.medicines,
+            activeMedications.value
+        )
+        _medicalReportResult.value = presetResult.copy(medicines = updatedCandidates)
+    }
+
+    fun clearMedicalReportResult() {
+        _medicalReportResult.value = null
+    }
+
+    fun confirmAndImportSelectedReportMedicines(
+        confirmedCandidates: List<com.example.data.ExtractedMedicineCandidate>,
+        reportResult: com.example.data.MedicalReportAnalysisResult
+    ) {
+        if (_userProfile.value.isParent) {
+            showSnackbar("⚠️ Parent / Caregiver account has read-only access.")
+            return
+        }
+
+        if (confirmedCandidates.isEmpty()) {
+            showSnackbar("No medicines selected for confirmation.")
+            return
+        }
+
+        viewModelScope.launch {
+            _isAnalyzingReport.value = true
+            var importedCount = 0
+
+            for (candidate in confirmedCandidates) {
+                val dosageStr = if (candidate.strength.isNotBlank()) candidate.strength else candidate.dosageForm
+                val medication = Medication(
+                    name = candidate.name,
+                    dosage = dosageStr,
+                    totalTablets = candidate.durationDays * candidate.timings.size,
+                    remainingTablets = candidate.durationDays * candidate.timings.size,
+                    startDate = "2026-08-10",
+                    endDate = "2026-09-10",
+                    timeOfConsumption = candidate.timeOfConsumption,
+                    beforeOrAfterFood = candidate.beforeOrAfterFood,
+                    instructions = candidate.instructions.ifBlank { "Prescribed via Medical Report" },
+                    category = "Prescription",
+                    prescribedBy = reportResult.doctorName ?: "Medical Report Scan"
+                )
+
+                val uid = _userProfile.value.uid
+                authRepo.saveMedicationToFirestore(uid, medication)
+                repository.addMedication(medication)
+                importedCount++
+            }
+
+            val uid = _userProfile.value.uid
+            if (uid.isNotBlank()) {
+                authRepo.saveMedicalReportToFirestore(
+                    uid = uid,
+                    reportId = reportResult.reportId,
+                    reportType = reportResult.reportType,
+                    extractedText = reportResult.rawExtractedText,
+                    medicineCount = importedCount
+                )
+            }
+
+            runDrugInteractionCheck()
+            showSnackbar("Successfully added $importedCount medicine(s) to CareSync schedule!")
+            _isAnalyzingReport.value = false
+            _medicalReportResult.value = null
         }
     }
 

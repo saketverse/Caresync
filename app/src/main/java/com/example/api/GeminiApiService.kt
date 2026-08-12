@@ -13,9 +13,12 @@ import retrofit2.http.POST
 import retrofit2.http.Query
 import java.util.concurrent.TimeUnit
 
+import retrofit2.http.Path
+
 interface GeminiRetrofitService {
-    @POST("v1beta/models/gemini-3.5-flash:generateContent")
+    @POST("v1beta/models/{model}:generateContent")
     suspend fun generateContent(
+        @Path("model") model: String = "gemini-3.1-pro-preview",
         @Query("key") apiKey: String,
         @Body request: GenerateContentRequest
     ): GenerateContentResponse
@@ -59,7 +62,7 @@ object GeminiClient {
         )
 
         try {
-            val response = service.generateContent(apiKey, request)
+            val response = service.generateContent("gemini-3.5-flash", apiKey, request)
             response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
                 ?: "No response generated from Gemini AI."
         } catch (e: Exception) {
@@ -93,7 +96,7 @@ object GeminiClient {
         )
 
         try {
-            val response = service.generateContent(apiKey, request)
+            val response = service.generateContent("gemini-3.1-pro-preview", apiKey, request)
             response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
                 ?: "No response generated from prescription OCR scan."
         } catch (e: Exception) {

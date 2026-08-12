@@ -70,6 +70,10 @@ fun MediGuardApp(
     val scannedText by viewModel.scannedText.collectAsStateWithLifecycle()
     val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
 
+    val medicalReportResult by viewModel.medicalReportResult.collectAsStateWithLifecycle()
+    val isAnalyzingReport by viewModel.isAnalyzingReport.collectAsStateWithLifecycle()
+    val activeScannerTab by viewModel.activeScannerTab.collectAsStateWithLifecycle()
+
     val snackbarMessage by viewModel.snackbarMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -381,7 +385,7 @@ fun MediGuardApp(
 
                 composable(Screen.AddMedication.route) {
                     AddMedicationScreen(
-                        onSaveMedication = { med -> viewModel.addMedication(med) },
+                        onSaveMedication = { med, onComplete -> viewModel.addMedication(med, onComplete) },
                         onNavigateBack = { navController.popBackStack() }
                     )
                 }
@@ -427,14 +431,26 @@ fun MediGuardApp(
                     PrescriptionScannerScreen(
                         scannedText = scannedText,
                         isScanning = isScanning,
+                        reportResult = medicalReportResult,
+                        isAnalyzingReport = isAnalyzingReport,
+                        activeScannerTab = activeScannerTab,
+                        activeMedications = medications,
                         selectedLanguage = selectedLanguage,
                         isElderMode = isElderMode,
-                        onScanPreset = { preset -> viewModel.scanPrescription(preset) },
-                        onImportMedication = { name, dosage, time, food ->
+                        onTabSelected = { tab -> viewModel.setActiveScannerTab(tab) },
+                        onAnalyzeReportImage = { base64 -> viewModel.analyzeMedicalReport(base64) },
+                        onLoadReportPreset = { preset -> viewModel.loadSampleReportPreset(preset) },
+                        onClearReportResult = { viewModel.clearMedicalReportResult() },
+                        onConfirmReportMedicines = { candidates, result ->
+                            viewModel.confirmAndImportSelectedReportMedicines(candidates, result)
+                        },
+                        onScanSinglePackage = { sample -> viewModel.scanPrescription(sample) },
+                        onImportSingleMedication = { name, dosage, time, food ->
                             viewModel.autoAddScannedMedicationToSchedule(name, dosage, time, food)
                         },
                         onReadAloudText = { text -> viewModel.speakText(text) },
-                        onNavigateToDashboard = navigateToDashboard
+                        onNavigateToDashboard = navigateToDashboard,
+                        onNavigateToAddMedicationManual = { navController.navigate(Screen.AddMedication.route) }
                     )
                 }
 

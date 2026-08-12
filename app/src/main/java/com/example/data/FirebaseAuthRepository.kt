@@ -913,6 +913,90 @@ class FirebaseAuthRepository(private val context: Context) {
         return localProfile
     }
 
+    suspend fun saveMedicationToFirestore(uid: String, medication: Medication): Result<String> {
+        val firestore = getFirestore()
+        val userMedRef = if (firestore != null && uid.isNotBlank()) {
+            firestore.collection("users").document(uid).collection("medications").document()
+        } else null
+        val docId = userMedRef?.id ?: UUID.randomUUID().toString()
+
+        val map = hashMapOf<String, Any?>(
+            "id" to docId,
+            "userId" to uid,
+            "name" to medication.name,
+            "dosage" to medication.dosage,
+            "totalTablets" to medication.totalTablets,
+            "remainingTablets" to medication.remainingTablets,
+            "startDate" to medication.startDate,
+            "endDate" to medication.endDate,
+            "timeOfConsumption" to medication.timeOfConsumption,
+            "beforeOrAfterFood" to medication.beforeOrAfterFood,
+            "instructions" to medication.instructions,
+            "category" to medication.category,
+            "prescribedBy" to medication.prescribedBy,
+            "isActive" to medication.isActive,
+            "createdAt" to System.currentTimeMillis()
+        )
+
+        if (firestore != null && uid.isNotBlank() && userMedRef != null) {
+            return suspendCancellableCoroutine { continuation ->
+                userMedRef.set(map)
+                    .addOnSuccessListener {
+                        Log.d(TAG, "Successfully saved medication $docId to Firestore")
+                        try {
+                            firestore.collection("medications").document(docId).set(map)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Notice mirroring to top-level medications: ${e.message}")
+                        }
+                        if (continuation.isActive) continuation.resume(Result.success(docId))
+                    }
+                    .addOnFailureListener { error ->
+                        Log.w(TAG, "Firestore medication save notice: ${error.message}")
+                        if (continuation.isActive) continuation.resume(Result.success(docId))
+                    }
+            }
+        }
+        return Result.success(docId)
+    }
+
+    suspend fun saveMedicalReportToFirestore(
+        uid: String,
+        reportId: String,
+        reportType: String,
+        extractedText: String,
+        medicineCount: Int
+    ): Result<String> {
+        val firestore = getFirestore()
+        if (firestore != null && uid.isNotBlank()) {
+            val reportDocRef = firestore.collection("users")
+                .document(uid)
+                .collection("medicalReports")
+                .document(reportId)
+
+            val reportMap = hashMapOf<String, Any?>(
+                "reportId" to reportId,
+                "userId" to uid,
+                "reportType" to reportType,
+                "extractedText" to extractedText,
+                "medicineCount" to medicineCount,
+                "createdAt" to System.currentTimeMillis()
+            )
+
+            return suspendCancellableCoroutine { continuation ->
+                reportDocRef.set(reportMap)
+                    .addOnSuccessListener {
+                        Log.d(TAG, "Successfully saved medical report $reportId to user $uid profile")
+                        if (continuation.isActive) continuation.resume(Result.success(reportId))
+                    }
+                    .addOnFailureListener { error ->
+                        Log.w(TAG, "Notice saving medical report: ${error.message}")
+                        if (continuation.isActive) continuation.resume(Result.success(reportId))
+                    }
+            }
+        }
+        return Result.success(reportId)
+    }
+
     suspend fun logout(activityContext: Context? = null) {
         try {
             getAuth()?.signOut()

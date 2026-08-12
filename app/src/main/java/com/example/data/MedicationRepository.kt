@@ -172,6 +172,61 @@ class MedicationRepository(private val dao: MedicationDao) {
         return GeminiClient.analyzeImageWithText(prompt, imageBase64, systemInstruction = system)
     }
 
+    suspend fun analyzeMedicalReportImage(
+        imageBase64: String,
+        activeMedications: List<Medication> = emptyList()
+    ): com.example.data.MedicalReportAnalysisResult {
+        val prompt = """
+            You are an expert medical OCR scanner and clinical prescription analyzer for CareSync.
+            Examine this medical report / prescription document image thoroughly.
+
+            Perform the following tasks:
+            1. Extract ALL readable text from the medical report.
+            2. Identify every single prescribed medicine listed in the document.
+            3. CRITICAL RULE: Strictly separate the medicine name from its strength, dosage, frequency, and duration.
+               - "name": Pure brand/generic drug name ONLY (e.g., "Amlodipine", "Metformin"). DO NOT include dosage strength or frequency in the name field.
+               - "strength": Dosage strength e.g. "5 mg", "500 mg", "20 mg".
+               - "dosageForm": e.g. "1 tablet", "1 capsule", "5 ml".
+               - "frequency": e.g. "Once daily", "Twice daily", "Thrice daily", "As needed".
+               - "timings": Array of intake time periods mentioned e.g. ["Morning"], ["Morning", "Night"], ["Morning", "Afternoon", "Evening"].
+               - "beforeOrAfterFood": "Before Food", "After Food", or "With Food".
+               - "durationDays": Count of prescribed days (e.g., 30, 7, 14, or default 30).
+               - "instructions": Special instructions for taking this medicine.
+               - "confidence": "HIGH" if clear print, "MEDIUM" if partially clear, "LOW" or "UNCERTAIN" if handwritten or blurry.
+               - "isUncertain": true if handwriting or text for this entry is difficult to read.
+
+            Return the result strictly as a JSON object with this exact structure:
+            {
+              "rawExtractedText": "full plain text extracted from report",
+              "reportType": "Prescription / Discharge Summary / Lab Report",
+              "doctorName": "Doctor name if visible",
+              "patientName": "Patient name if visible",
+              "doctorNotes": "General advice or notes",
+              "confidenceNote": "High confidence printed prescription / Low confidence handwritten",
+              "requiresManualVerification": false,
+              "medicines": [
+                {
+                  "name": "Amlodipine",
+                  "strength": "5 mg",
+                  "dosageForm": "1 tablet",
+                  "frequency": "Once daily",
+                  "timings": ["Morning"],
+                  "beforeOrAfterFood": "After Food",
+                  "durationDays": 30,
+                  "instructions": "Take for blood pressure",
+                  "confidence": "HIGH",
+                  "isUncertain": false
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val system = "You are CareSync Vision AI. Extract accurate prescription details and return clean JSON."
+        val response = GeminiClient.analyzeImageWithText(prompt, imageBase64, systemInstruction = system)
+
+        return com.example.util.MedicalReportExtractor.parseGeminiReportResponse(response, activeMedications)
+    }
+
     // --- Seed Demo Data if Database Empty ---
     suspend fun seedInitialDataIfEmpty() {
         val currentMeds = dao.getAllActiveMedications().first()
